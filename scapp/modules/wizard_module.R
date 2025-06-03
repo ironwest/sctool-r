@@ -38,7 +38,7 @@ wizard_module_ui <- function(id) {
       ),
       div(
         pmap(list(
-          list("A","B","C","D","E-H"), #セクションアルファベット
+          list("A","B","C","D","EH"), #セクションアルファベット
           list(
             "A)あなたの仕事についてうかがいます",
             "B)最近1か月間のあなたの状態についてうかがいます",
@@ -72,7 +72,7 @@ wizard_module_ui <- function(id) {
   
   value_mapping_tabpanels <- pmap(
     list(
-      list("A","B","C","D","E-H"), #panel title
+      list("A","B","C","D","EH"), #panel title
       list(c(1:17),c(18:46),c(47:55),c(56:57),c(58:80)), #qnumbers
       list(
         c("そうだ","まあそうだ","ややちがう","ちがう"),
@@ -506,52 +506,53 @@ wizard_module_server <- function(id, year_label) {
         sort() %>%
         {c("未選択",.)}
         
-      walk(c("A","B","C","D","E-H"), ~{
+      walk(c("A","B","C","D","EH"), ~{
         updateSelectInput(session, inputId = paste0("oavmap_",.,"1"), choices = possible_choices)
         updateSelectInput(session, inputId = paste0("oavmap_",.,"2"), choices = possible_choices)
         updateSelectInput(session, inputId = paste0("oavmap_",.,"3"), choices = possible_choices)
         updateSelectInput(session, inputId = paste0("oavmap_",.,"4"), choices = possible_choices)
       })
-      
-      
+    
     }) # observeの終わり
     
-    
-    
-    # --- 一括設定ボタンのサーバーロジック ---
-    
-    #ns(paste0("oavmap_",..1,"_admit"))
-    observeEvent(input$oavmap_A_admit, {
-      
-    })
-    # UI側の inputId: ns(paste0("oavmap_",..1,"_admit"))
-    sections_for_bulk_buttons <- list( # ボタンの..1部分と対応する質問群
-      A     = 1:17,
-      B     = 18:46,
-      C     = 47:55,
-      D     = 56:57,
-      `E-H` = 58:80
+    ## --- 一括設定ボタンのサーバーロジック ------
+    purrr::pmap(
+      list(
+        list("A","B","C","D","EH"),
+        list(c(1:17),c(18:46),c(47:55),c(56:57),c(58:80))
+      ),
+      ~{
+        #ns(paste0("oavmap_",..1,"_admit"))
+        observeEvent(input[[paste0("oavmap_",..1,"_admit")]], {
+          setval1 <- input[[paste0("oavmap_",..1,"1")]] %||% ""
+          setval2 <- input[[paste0("oavmap_",..1,"2")]] %||% ""
+          setval3 <- input[[paste0("oavmap_",..1,"3")]] %||% ""
+          setval4 <- input[[paste0("oavmap_",..1,"4")]] %||% ""
+          setvals <- c(setval1,setval2,setval3,setval4)
+          
+          if(any(setvals %in% "")){
+            showModal(modalDialog(title="注意", "一括設定する4つの値をすべて選択してください。", easyClose = TRUE))
+            return()
+          }
+          
+          map(..2, ~{
+            updateSelectInput(session, inputId = paste0("vmap_q",.,"_1"), selected = setval1)
+            updateSelectInput(session, inputId = paste0("vmap_q",.,"_2"), selected = setval2)
+            updateSelectInput(session, inputId = paste0("vmap_q",.,"_3"), selected = setval3)
+            updateSelectInput(session, inputId = paste0("vmap_q",.,"_4"), selected = setval4)  
+          })
+          
+          showNotification(
+            paste0(year_label, " のセクション",.x,"の質問群に一括設定を適用しました。"), 
+            type = "message", 
+            session=session
+          )
+          
+        })
+        
+      }
     )
-
-    purrr::walk(names(sections_for_bulk_buttons), function(section_alpha) {
-      observeEvent(input[[paste0("oavmap_", section_alpha, "_admit")]], {
-        # inputId: ns(paste0("oavmap_",..1,"1")) などから値を取得
-        bulk_values <- sapply(1:4, function(i) input[[paste0("oavmap_", section_alpha, i)]] %||% "")
-        
-        if (any(sapply(bulk_values, function(x) x == ""))) {
-          showModal(modalDialog(title="注意", "一括設定する4つの値をすべて選択してください。", easyClose = TRUE))
-          return()
-        }
-        
-        question_indices_to_update <- sections_for_bulk_buttons[[section_alpha]]
-        for (q_idx in question_indices_to_update) {
-          q_id_str <- paste0("q", q_idx)
-          rv$value_map_nbjsq_individual[[q_id_str]] <- as.list(bulk_values)
-        }
-        showNotification(paste0(year_label, " のセクション ", section_alpha, " の質問群に一括設定を適用しました。"), type = "message", session=session)
-        # rvが更新されたので、個別のselectInputも次のobserveサイクルで更新される（はず）
-      })
-    })
+    
     
     # --- 値マッピング設定の読み込み ---
     observeEvent(input$val_map_config_load_input, {
@@ -598,7 +599,7 @@ wizard_module_server <- function(id, year_label) {
         
         # 2. 一括設定用 (UIからrvへ)
         sections_map_to_rv_bulk <- list(
-          A = "group_aefgh", B = "group_b", C = "group_c", D = "group_d", `E-H` = "group_aefgh"
+          A = "group_aefgh", B = "group_b", C = "group_c", D = "group_d", `EH` = "group_aefgh"
         )
         for(section_alpha in names(sections_map_to_rv_bulk)){
           rv_key <- sections_map_to_rv_bulk[[section_alpha]]
@@ -640,7 +641,7 @@ wizard_module_server <- function(id, year_label) {
         paste0(year_label, "のデータ設定が完了しました。分析に進む準備ができました。"),
         footer = modalButton("閉じる")
       ))
-      # rv$wizard_step <- 1 # or a specific "completed" step like 4
+      rv$wizard_step <- 4 # or a specific "completed" step like 4
     })
     
     return(
@@ -701,9 +702,11 @@ server <- function(input, output, session) {
   # モジュールの返り値を利用する例 (デバッグ用)
   observe({
     req(current_year_results$is_setup_complete()) # setupが完了したら
+    browser()
     if (current_year_results$is_setup_complete()) {
       cat("今年度の設定が完了しました。\n")
       print(str(current_year_results$get_column_map()))
+      write_rds(current_year_results, "temp.rds")
       # print(str(current_year_results$get_value_map()))
     }
   })
