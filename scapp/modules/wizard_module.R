@@ -6,23 +6,117 @@ library(jsonlite) # 設定ファイルのJSON処理のため
 library(readr)
 library(stringr)
 library(purrr)
+library(dplyr)
+library(tidyr)
 
 # `%||%` 演算子 (NULL の場合にデフォルト値を返すヘルパー)
 `%||%` <- function(a, b) if (!is.null(a)) a else b
+
+
+#値マッピング用で利用する質問番号の順番に質問の文章が含まれるベクトル
+qtext <- read_csv("nbjsq_question_text.csv") |> dplyr::pull(qtext)
+
+
+
 
 # --- ウィザードモジュール UI (wizard_module_ui) ---
 # (前の回答で提供された wizard_module_ui のコードをここに記述)
 wizard_module_ui <- function(id) {
   ns <- NS(id) # 名前空間関数を取得
-
+  
+  # 値マッピングのタブUI(可読性アップのため)-----------------
+  overall_value_mapping_tabpanel <- 
+    tabPanel(
+      title = "一括設定", 
+      value = "bulk_settings",
+      style = paste(
+        "margin-top:20px;",
+        "height: 600px;",
+        "overflow-y: auto;",
+        "border: 1px solid #eeeeee;",
+        "padding: 10px;"
+      ),
+      div(
+        pmap(list(
+          list("A","B","C","D","E-H"), #セクションアルファベット
+          list(
+            "A)あなたの仕事についてうかがいます",
+            "B)最近1か月間のあなたの状態についてうかがいます",
+            "C)あなたの周りの方々についてうかがいます",
+            "D)満足度についてうかがいます",
+            "E-H)仕事・職場・会社について"
+          ), #設問の名前
+          list(
+            c("そうだ","まあそうだ","ややちがう","ちがう"),
+            c("ほとんどなかった","ときどきあった","しばしばあった","ほとんどいつもあった"),
+            c("非常に","かなり","多少","まったくない"),
+            c("満足","まあ満足","やや不満足","不満足"),
+            c("そうだ","まあそうだ","ややちがう","ちがう")
+          ) #選択のベクトル
+        ), ~{
+          div(
+            fluidRow(
+              style = "margin-top:20pt;",
+              column(width = 2, ..2),
+              column(width = 2, selectInput(inputId = ns(paste0("oavmap_",..1,"1")), label = ..3[1], choices = c())),
+              column(width = 2, selectInput(inputId = ns(paste0("oavmap_",..1,"2")), label = ..3[2], choices = c())),
+              column(width = 2, selectInput(inputId = ns(paste0("oavmap_",..1,"3")), label = ..3[3], choices = c())),
+              column(width = 2, selectInput(inputId = ns(paste0("oavmap_",..1,"4")), label = ..3[4], choices = c())),
+              column(width = 2, actionButton(inputId = ns(paste0("oavmap_",..1,"_admit")), label = "上書き設定"))
+            ),
+            hr()  
+          )
+        })
+      )
+    )
+  
+  value_mapping_tabpanels <- pmap(
+    list(
+      list("A","B","C","D","E-H"), #panel title
+      list(c(1:17),c(18:46),c(47:55),c(56:57),c(58:80)), #qnumbers
+      list(
+        c("そうだ","まあそうだ","ややちがう","ちがう"),
+        c("ほとんどなかった","ときどきあった","しばしばあった","ほとんどいつもあった"),
+        c("非常に","かなり","多少","まったくない"),
+        c("満足","まあ満足","やや不満足","不満足"),
+        c("そうだ","まあそうだ","ややちがう","ちがう")
+      ) #選択のベクトル
+    ), 
+    ~{
+      choice_of_qs <- ..3
+      tabPanel(
+        title = ..1, 
+        div(
+          style = paste(
+            "margin-top:20px;",
+            "height: 600px;",
+            "overflow-y: auto;",
+            "border: 1px solid #eeeeee;",
+            "padding: 10px;"
+          ),
+          map(..2, ~{
+            fluidRow(
+              column(width=3,paste0(.,")",qtext[.])),
+              column(width=2,selectInput(label=choice_of_qs[1], inputId = ns(paste0("vmap_q",.,"_1")), choices = c())),
+              column(width=2,selectInput(label=choice_of_qs[2], inputId = ns(paste0("vmap_q",.,"_2")), choices = c())),
+              column(width=2,selectInput(label=choice_of_qs[3], inputId = ns(paste0("vmap_q",.,"_3")), choices = c())),
+              column(width=2,selectInput(label=choice_of_qs[4], inputId = ns(paste0("vmap_q",.,"_4")), choices = c()))
+            )  
+          })
+        )
+      ) 
+    }
+  )
+  
+ #ui本体---------------------
   fluidPage(
     id = ns("wizard_page"),
 
-    # ウィザードヘッダー/進捗表示
+    ## ウィザードヘッダー/進捗表示 ------
     uiOutput(ns("wizard_step_indicator_ui")),
     hr(),
 
-    # ステップ1: CSVファイルのアップロード
+    ## ステップ1: CSVファイルのアップロード ------
     conditionalPanel(
       condition = paste0("output['", ns("wizard_show_step1"), "'] == true"),
       div(
@@ -41,7 +135,7 @@ wizard_module_ui <- function(id) {
       )
     ),
     
-    # ステップ2: 列名マッピング
+    ## ステップ2: 列名マッピング --------
     conditionalPanel(
       condition = paste0("output['", ns("wizard_show_step2"), "'] == true"),
       div(
@@ -71,6 +165,13 @@ wizard_module_ui <- function(id) {
         ),
         h4("NBJSQの各質問項目に対応する列設定"),
         wellPanel(
+          style = paste(
+            "margin-top:20px;",
+            "height: 600px;",
+            "overflow-y: auto;",
+            "border: 1px solid #eeeeee;",
+            "padding: 10px;"
+          ),
           map(1:20, ~{
             i <- 4*(. - 1)
             fluidRow(
@@ -87,7 +188,7 @@ wizard_module_ui <- function(id) {
       )
     ),
     
-    # ステップ3: 値マッピング
+    ## ステップ3: 値マッピング ----------------------
     conditionalPanel(
       condition = paste0("output['", ns("wizard_show_step3"), "'] == true"),
       div(
@@ -108,52 +209,23 @@ wizard_module_ui <- function(id) {
         hr(),
         h4("性別の値マッピング"),
         wellPanel(
-          uiOutput(ns("gender_val_map_main_ui")) # 動的生成UI
+          fluidRow(
+            column(width = 6, selectInput(ns("val_map_gender_male"), "CSV内の「男性」に対応する値:",
+                                          choices = c("男性","女性"), selected = NULL)),
+            column(width = 6, selectInput(ns("val_map_gender_female"), "CSV内の「女性」に対応する値:",
+                                          choices = c("男性","女性"), selected = NULL))
+          )
         ),
         h4("NBJSQの値マッピング"),
         wellPanel(
           tabsetPanel(
             id = ns("nbjsq_val_map_tabs"),
-            tabPanel(
-              title = "一括設定", 
-              value = "bulk_settings", 
-              div(
-                pmap(list(
-                  list("A","B","C","D","E-H"), #セクションアルファベット
-                  list(
-                    "A)あなたの仕事についてうかがいます",
-                    "B)最近1か月間のあなたの状態についてうかがいます",
-                    "C)あなたの周りの方々についてうかがいます",
-                    "D)満足度についてうかがいます",
-                    "E-H)仕事・職場・会社について"
-                  ), #設問の名前
-                  list(
-                    c("そうだ","まあそうだ","ややちがう","ちがう"),
-                    c("ほとんどなかった","ときどきあった","しばしばあった","ほとんどいつもあった"),
-                    c("非常に","かなり","多少","まったくない"),
-                    c("満足","まあ満足","やや不満足","不満足"),
-                    c("そうだ","まあそうだ","ややちがう","ちがう")
-                  ) #選択のベクトル
-                ), ~{
-                  div(
-                    fluidRow(
-                      style = "margin-top:20pt; display: flex;",
-                      column(width = 2, 
-                             style = "align-self: flex-start",
-                             ..2),
-                      column(width = 2, selectInput(inputId = ns(paste0("oavmap_",..1,"1")), label = ..3[1], choices = c())),
-                      column(width = 2, selectInput(inputId = ns(paste0("oavmap_",..1,"2")), label = ..3[2], choices = c())),
-                      column(width = 2, selectInput(inputId = ns(paste0("oavmap_",..1,"3")), label = ..3[3], choices = c())),
-                      column(width = 2, selectInput(inputId = ns(paste0("oavmap_",..1,"4")), label = ..3[4], choices = c())),
-                      column(width = 2, 
-                             style = "align-self: flex-end;",
-                             actionButton(inputId = ns(paste0("oavmap_",..1,"_admit")), label = "上書き設定"))
-                    ),
-                    hr()  
-                  )
-                })
-              )
-            )
+            overall_value_mapping_tabpanel,
+            value_mapping_tabpanels[[1]],
+            value_mapping_tabpanels[[2]],
+            value_mapping_tabpanels[[3]],
+            value_mapping_tabpanels[[4]],
+            value_mapping_tabpanels[[5]]
           )
         ),
         hr(),
@@ -371,46 +443,6 @@ wizard_module_server <- function(id, year_label) {
       return(c("未選択" = "", stats::setNames(unique_vals, unique_vals)))
     }
     
-    output$gender_val_map_main_ui <- renderUI({
-      choices_list <- get_unique_values_from_mapped_column(rv$column_map_gender)
-      tagList(
-        fluidRow(
-          column(width = 6, selectInput("val_map_gender_male", "CSV内の「男性」に対応する値:",
-                                        choices = choices_list, selected = rv$value_map_gender$male %||% "")),
-          column(width = 6, selectInput("val_map_gender_female", "CSV内の「女性」に対応する値:",
-                                        choices = choices_list, selected = rv$value_map_gender$female %||% ""))
-        )
-      )
-    })
-    
-    output$nbjsq_val_map_bulk_ui <- renderUI({
-      req(rv$csv_data, rv$column_map_nbjsq)
-      q1_col_name <- rv$column_map_nbjsq[["q1"]]
-      sample_choices <- get_unique_values_from_mapped_column(q1_col_name)
-      if (length(sample_choices) <= 1 && names(sample_choices)[1] != "未選択" ) { # names() check for empty unique_vals
-        sample_choices <- c("未選択"="", "1","2","3","4")
-      }
-      
-      tagList(
-        p("各評価尺度に対応するCSV内の値を設定し、「一括設定」ボタンで関連する質問群に適用します。"),
-        h5("スケール: そうだ(4) / まあそうだ(3) / ややちがう(2) / ちがう(1)"),
-        fluidRow(lapply(1:4, function(i) column(width=3, selectInput(paste0("val_map_nbjsq_bulk_aefgh_",i), c("そうだ","まあそうだ","ややちがう","ちがう")[i], choices=sample_choices, selected=rv$value_map_nbjsq_bulk$group_aefgh[[i]] %||% "")))),
-        actionButton("bulk_set_aefgh_button", "グループA,E,F,G,Hに一括設定"),
-        hr(),
-        h5("スケール: ほとんどなかった(1) / ときどきあった(2) / しばしばあった(3) / ほとんどいつもあった(4)"),
-        fluidRow(lapply(1:4, function(i) column(width=3, selectInput(paste0("val_map_nbjsq_bulk_b_",i), c("ほとんどなかった","ときどきあった","しばしばあった","ほとんどいつもあった")[i], choices=sample_choices, selected=rv$value_map_nbjsq_bulk$group_b[[i]] %||% "")))),
-        actionButton("bulk_set_b_button", "グループBに一括設定"),
-        hr(),
-        h5("スケール: 非常に(4) / かなり(3) / 多少(2) / まったくない(1)"),
-        fluidRow(lapply(1:4, function(i) column(width=3, selectInput(paste0("val_map_nbjsq_bulk_c_",i), c("非常に","かなり","多少","まったくない")[i], choices=sample_choices, selected=rv$value_map_nbjsq_bulk$group_c[[i]] %||% "")))),
-        actionButton("bulk_set_c_button", "グループCに一括設定"),
-        hr(),
-        h5("スケール: 満足(4) / まあ満足(3) / やや不満足(2) / 不満足(1)"),
-        fluidRow(lapply(1:4, function(i) column(width=3, selectInput(paste0("val_map_nbjsq_bulk_d_",i), c("満足","まあ満足","やや不満足","不満足")[i], choices=sample_choices, selected=rv$value_map_nbjsq_bulk$group_d[[i]] %||% "")))),
-        actionButton("bulk_set_d_button", "グループDに一括設定")
-      )
-    })
-    
     generate_nbjsq_individual_value_map_ui_server <- function(question_indices, scale_labels, group_id_prefix_for_ui_layout_not_input_id, input_id_prefix_for_select) {
       req(rv$csv_data, rv$column_map_nbjsq)
       first_q_col_name <- rv$column_map_nbjsq[[paste0("q", question_indices[1])]] # 最初の質問の列名を取得
@@ -446,97 +478,163 @@ wizard_module_server <- function(id, year_label) {
       )
     }
     
-    output$nbjsq_val_map_group_a_ui <- renderUI({ generate_nbjsq_individual_value_map_ui_server(1:17, c("そうだ","まあそうだ","ややちがう","ちがう"), "group_a", "val_map_nbjsq_ind_a") })
-    output$nbjsq_val_map_group_b_ui <- renderUI({ generate_nbjsq_individual_value_map_ui_server(18:46, c("ほとんどなかった","ときどきあった","しばしばあった","ほとんどいつもあった"), "group_b", "val_map_nbjsq_ind_b") })
-    output$nbjsq_val_map_group_c_ui <- renderUI({ generate_nbjsq_individual_value_map_ui_server(47:55, c("非常に","かなり","多少","まったくない"), "group_c", "val_map_nbjsq_ind_c") })
-    output$nbjsq_val_map_group_d_ui <- renderUI({ generate_nbjsq_individual_value_map_ui_server(56:57, c("満足","まあ満足","やや不満足","不満足"), "group_d", "val_map_nbjsq_ind_d") })
-    output$nbjsq_val_map_group_e_h_ui <- renderUI({ generate_nbjsq_individual_value_map_ui_server(58:80, c("そうだ","まあそうだ","ややちがう","ちがう"), "group_e_h", "val_map_nbjsq_ind_e_h") })
+    # --- 値マッピングUIのchoicesとselectedを更新する observe ブロック -------
+    observe({
+      req(rv$wizard_step == 3, rv$csv_data, rv$column_map_gender, rv$column_map_nbjsq) # ステップ3かつ必要なデータがある場合
+      
+      # 1. 性別の値マッピングUIの更新
+      gender_choices <- get_unique_values_from_mapped_column(rv$column_map_gender) 
+      updateSelectInput(session, "val_map_gender_male", choices = gender_choices, selected = rv$value_map_gender$male %||% "")
+      updateSelectInput(session, "val_map_gender_female", choices = gender_choices, selected = rv$value_map_gender$female %||% "")
+      
+      # 2. 各選択肢の作成
+      walk(1:80, ~{
+        uniquevals <- sort(unique(rv$csv_data[[input[[paste0("colmap_nbjsq_",.)]]]])) #列マッピングされた列のユニークな数字
+        updateSelectInput(session, inputId = paste0("vmap_q",.,"_1"), choices = uniquevals, selected = uniquevals[1])
+        updateSelectInput(session, inputId = paste0("vmap_q",.,"_2"), choices = uniquevals, selected = uniquevals[2])
+        updateSelectInput(session, inputId = paste0("vmap_q",.,"_3"), choices = uniquevals, selected = uniquevals[3])
+        updateSelectInput(session, inputId = paste0("vmap_q",.,"_4"), choices = uniquevals, selected = uniquevals[4])
+      })
+      
+      # 3. NBJSQ 一括設定タブのUI更新
+      target_cols <- map_chr(1:80, ~input[[paste0("colmap_nbjsq_",.)]])
+      possible_choices <- rv$csv_data |> 
+        dplyr::select(!!!rlang::syms(target_cols)) |> 
+        pivot_longer(cols = everything()) |> 
+        pull(value) |> 
+        unique() |> 
+        sort() %>%
+        {c("未選択",.)}
+        
+      walk(c("A","B","C","D","E-H"), ~{
+        updateSelectInput(session, inputId = paste0("oavmap_",.,"1"), choices = possible_choices)
+        updateSelectInput(session, inputId = paste0("oavmap_",.,"2"), choices = possible_choices)
+        updateSelectInput(session, inputId = paste0("oavmap_",.,"3"), choices = possible_choices)
+        updateSelectInput(session, inputId = paste0("oavmap_",.,"4"), choices = possible_choices)
+      })
+      
+      
+    }) # observeの終わり
     
-    observe_bulk_set_button_server <- function(button_id, bulk_input_prefix, question_indices) {
-      observeEvent(input[[button_id]], {
-        bulk_values <- sapply(1:4, function(i) input[[paste0(bulk_input_prefix, "_", i)]] %||% "")
+    
+    
+    # --- 一括設定ボタンのサーバーロジック ---
+    
+    #ns(paste0("oavmap_",..1,"_admit"))
+    observeEvent(input$oavmap_A_admit, {
+      
+    })
+    # UI側の inputId: ns(paste0("oavmap_",..1,"_admit"))
+    sections_for_bulk_buttons <- list( # ボタンの..1部分と対応する質問群
+      A     = 1:17,
+      B     = 18:46,
+      C     = 47:55,
+      D     = 56:57,
+      `E-H` = 58:80
+    )
+
+    purrr::walk(names(sections_for_bulk_buttons), function(section_alpha) {
+      observeEvent(input[[paste0("oavmap_", section_alpha, "_admit")]], {
+        # inputId: ns(paste0("oavmap_",..1,"1")) などから値を取得
+        bulk_values <- sapply(1:4, function(i) input[[paste0("oavmap_", section_alpha, i)]] %||% "")
+        
         if (any(sapply(bulk_values, function(x) x == ""))) {
           showModal(modalDialog(title="注意", "一括設定する4つの値をすべて選択してください。", easyClose = TRUE))
           return()
         }
-        for (q_idx in question_indices) {
+        
+        question_indices_to_update <- sections_for_bulk_buttons[[section_alpha]]
+        for (q_idx in question_indices_to_update) {
           q_id_str <- paste0("q", q_idx)
           rv$value_map_nbjsq_individual[[q_id_str]] <- as.list(bulk_values)
         }
-        showNotification(paste0(year_label, " の ", gsub("_button", "", button_id), " グループに一括設定を適用しました。"), type = "message", session=session)
+        showNotification(paste0(year_label, " のセクション ", section_alpha, " の質問群に一括設定を適用しました。"), type = "message", session=session)
+        # rvが更新されたので、個別のselectInputも次のobserveサイクルで更新される（はず）
       })
-    }
-    observe_bulk_set_button_server("bulk_set_aefgh_button", "val_map_nbjsq_bulk_aefgh", c(1:17, 58:80))
-    observe_bulk_set_button_server("bulk_set_b_button", "val_map_nbjsq_bulk_b", 18:46)
-    observe_bulk_set_button_server("bulk_set_c_button", "val_map_nbjsq_bulk_c", 47:55)
-    observe_bulk_set_button_server("bulk_set_d_button", "val_map_nbjsq_bulk_d", 56:57)
+    })
     
+    # --- 値マッピング設定の読み込み ---
     observeEvent(input$val_map_config_load_input, {
       req(input$val_map_config_load_input)
       tryCatch({
         config <- jsonlite::fromJSON(input$val_map_config_load_input$datapath)
+        
+        # 性別
         rv$value_map_gender <- config$gender %||% list(male="", female="")
+        
+        # 一括設定用
         rv$value_map_nbjsq_bulk$group_aefgh <- config$nbjsq_bulk$group_aefgh %||% rep(list(""),4)
         rv$value_map_nbjsq_bulk$group_b     <- config$nbjsq_bulk$group_b %||% rep(list(""),4)
         rv$value_map_nbjsq_bulk$group_c     <- config$nbjsq_bulk$group_c %||% rep(list(""),4)
         rv$value_map_nbjsq_bulk$group_d     <- config$nbjsq_bulk$group_d %||% rep(list(""),4)
+        # for (section_alpha in c("A","B","C","D")) { # E-HはAと同じrvを使っているので不要
+        #   for (j in 1:4) { # updateSelectInput(session, paste0("oavmap_",section_alpha,j), selected = ...)}
+        # }
         
+        # 個別設定用
         loaded_individual_map <- config$nbjsq_individual
         if(!is.null(loaded_individual_map) && is.list(loaded_individual_map) && length(loaded_individual_map) == 80 && !is.null(names(loaded_individual_map))){
           rv$value_map_nbjsq_individual <- loaded_individual_map
-        } # else keep default
+        }
+        # for (q_num in 1:80) { for (val_idx in 1:4) { updateSelectInput(...) } }
         
-        showNotification(paste0(year_label, "の値マッピング設定を読み込みました。"), type = "message", session=session)
+        showNotification(paste0(year_label, "の値マッピング設定を読み込みました。UIが更新されます。"), type = "message", session=session)
+        # rvが更新されたので、上記のobserveブロックが走り、UIのselected値が更新されるはず
       }, error = function(e) {
         showModal(modalDialog(title = "エラー", paste0(year_label, "の値マッピング設定ファイル読み込み失敗: ", e$message), easyClose = TRUE))
       })
     })
     
+    # --- 値マッピング設定の保存 ---
     output$val_map_config_save_button <- downloadHandler(
       filename = function() {
         paste0("value_mapping_config_", year_label, "_", Sys.Date(), ".json")
       },
       content = function(file) {
+        # 現在のUIの入力値をrvに保存する
+        # 1. 性別
         rv$value_map_gender$male <- input$val_map_gender_male %||% ""
         rv$value_map_gender$female <- input$val_map_gender_female %||% ""
         
-        rv$value_map_nbjsq_bulk$group_aefgh <- sapply(1:4, function(i) input[[paste0("val_map_nbjsq_bulk_aefgh_",i)]] %||% "")
-        rv$value_map_nbjsq_bulk$group_b     <- sapply(1:4, function(i) input[[paste0("val_map_nbjsq_bulk_b_",i)]] %||% "")
-        rv$value_map_nbjsq_bulk$group_c     <- sapply(1:4, function(i) input[[paste0("val_map_nbjsq_bulk_c_",i)]] %||% "")
-        rv$value_map_nbjsq_bulk$group_d     <- sapply(1:4, function(i) input[[paste0("val_map_nbjsq_bulk_d_",i)]] %||% "")
-        
-        group_prefixes_map <- list(
-          val_map_nbjsq_ind_a = 1:17, val_map_nbjsq_ind_b = 18:46,
-          val_map_nbjsq_ind_c = 47:55, val_map_nbjsq_ind_d = 56:57,
-          val_map_nbjsq_ind_e_h = 58:80
+        # 2. 一括設定用 (UIからrvへ)
+        sections_map_to_rv_bulk <- list(
+          A = "group_aefgh", B = "group_b", C = "group_c", D = "group_d", `E-H` = "group_aefgh"
         )
-        current_individual_map <- rv$value_map_nbjsq_individual # Start with existing or default
-        for(prefix in names(group_prefixes_map)){
-          indices <- group_prefixes_map[[prefix]]
-          for(q_num in indices){
-            q_id_str <- paste0("q", q_num)
-            # Collect values for this question if its UI is currently rendered and inputs exist
-            vals_for_q <- sapply(1:4, function(i) input[[paste0(prefix, "_q", q_num, "_val", i)]])
-            if(!all(sapply(vals_for_q, is.null))){ # if any input was found
-              current_individual_map[[q_id_str]] <- as.list(sapply(vals_for_q, `%||%`, ""))
-            }
-          }
+        for(section_alpha in names(sections_map_to_rv_bulk)){
+          rv_key <- sections_map_to_rv_bulk[[section_alpha]]
+          rv$value_map_nbjsq_bulk[[rv_key]] <- sapply(1:4, function(i) input[[paste0("oavmap_", section_alpha, i)]] %||% "")
+        }
+        
+        # 3. 個別設定用 (UIからrvへ)
+        # UI側のinputId: ns(paste0("vmap_q",.,"_1"))
+        # (nsはサーバー側では自動的に解決されるのでinput$vmap_qX_Yでアクセス)
+        current_individual_map <- stats::setNames(lapply(1:80, function(x) rep(list(""), 4)), paste0("q", 1:80))
+        for(q_num in 1:80){
+          q_id_str <- paste0("q", q_num)
+          vals_for_q <- sapply(1:4, function(val_idx) {
+            # UIのinputIdは ns(paste0("vmap_q", q_num, "_", val_idx)) なので、
+            # サーバー側では input[[paste0("vmap_q", q_num, "_", val_idx)]] で取得
+            input[[paste0("vmap_q", q_num, "_", val_idx)]] %||% ""
+          })
+          current_individual_map[[q_id_str]] <- as.list(vals_for_q)
         }
         rv$value_map_nbjsq_individual <- current_individual_map
         
-        current_config <- list(
+        # rvの内容をJSONとして書き出し
+        current_config_to_save <- list(
           gender = rv$value_map_gender,
           nbjsq_bulk = rv$value_map_nbjsq_bulk,
           nbjsq_individual = rv$value_map_nbjsq_individual
         )
-        jsonlite::write_json(current_config, file, pretty = TRUE, auto_unbox = FALSE)
+        jsonlite::write_json(current_config_to_save, file, pretty = TRUE, auto_unbox = FALSE)
       }
     )
     
+    # ステップ3のナビゲーションボタン
     observeEvent(input$back_to_step2_button, { rv$wizard_step <- 2 })
     observeEvent(input$finish_setup_button, {
-      # 最終保存処理 (downloadHandler内で行っているため、ここではrvの値を最終確認する程度でも良い)
-      # (downloadHandlerはボタンではないので、ここでinputからrvへの最終的な移し替えが必要な場合もある)
+      # 最終保存処理はdownloadHandlerに任せているので、ここでは完了メッセージのみ
+      # 必要なら、ここでもUIからrvへの最終的な値の移し替えを行う
       showModal(modalDialog(
         title = paste0(year_label, " 設定完了"),
         paste0(year_label, "のデータ設定が完了しました。分析に進む準備ができました。"),
