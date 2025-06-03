@@ -14,24 +14,24 @@ library(purrr)
 # (前の回答で提供された wizard_module_ui のコードをここに記述)
 wizard_module_ui <- function(id) {
   ns <- NS(id) # 名前空間関数を取得
-  
+
   fluidPage(
     id = ns("wizard_page"),
-    
+
     # ウィザードヘッダー/進捗表示
     uiOutput(ns("wizard_step_indicator_ui")),
     hr(),
-    
+
     # ステップ1: CSVファイルのアップロード
     conditionalPanel(
-      condition = paste0("output['", ns("wizard_show_step1"), "'] == true"), # 条件式を正しく構成
+      condition = paste0("output['", ns("wizard_show_step1"), "'] == true"),
       div(
         id = ns("step1_ui"),
         h3("ステップ1: CSVファイルのアップロード"),
         p("ストレスチェック結果（CSV形式）をアップロードしてください。"),
         fileInput(ns("csv_file_input"), "CSVファイルを選択",
                   multiple = FALSE,
-                  accept = c("text/csv", "text/comma-separated-values,text/plain", ".csv"),
+                  accept = c("text/csv", "text/comma-separated-values,text/plain", ".csv"), 
                   buttonLabel = "ファイルを選択...",
                   placeholder = "ファイルが選択されていません"),
         textOutput(ns("csv_upload_status_text")),
@@ -80,7 +80,6 @@ wizard_module_ui <- function(id) {
               column(width=3,selectInput(ns(str_c("colmap_nbjsq_",i+4)), str_c("質問:",i+4), choices = c("未選択" = "")))
             )
           })
-          #uiOutput(ns("nbjsq_col_map_main_ui")) # 動的生成UI
         ),
         hr(),
         actionButton(ns("back_to_step1_button"), "戻る：CSVアップロード", icon = icon("arrow-left")),
@@ -114,13 +113,47 @@ wizard_module_ui <- function(id) {
         h4("NBJSQの値マッピング"),
         wellPanel(
           tabsetPanel(
-            id = ns("nbjsq_val_map_tabs"), # tabsetPanel自体にもIDが必要な場合がある
-            tabPanel("一括設定", value = "bulk_settings", uiOutput(ns("nbjsq_val_map_bulk_ui"))), # value属性を追加
-            tabPanel("質問群A (Q1-17)", value = "group_a", uiOutput(ns("nbjsq_val_map_group_a_ui"))),
-            tabPanel("質問群B (Q18-46)", value = "group_b", uiOutput(ns("nbjsq_val_map_group_b_ui"))),
-            tabPanel("質問群C (Q47-55)", value = "group_c", uiOutput(ns("nbjsq_val_map_group_c_ui"))),
-            tabPanel("質問群D (Q56-57)", value = "group_d", uiOutput(ns("nbjsq_val_map_group_d_ui"))),
-            tabPanel("質問群E-H (Q58-80)", value = "group_e_h", uiOutput(ns("nbjsq_val_map_group_e_h_ui")))
+            id = ns("nbjsq_val_map_tabs"),
+            tabPanel(
+              title = "一括設定", 
+              value = "bulk_settings", 
+              div(
+                pmap(list(
+                  list("A","B","C","D","E-H"), #セクションアルファベット
+                  list(
+                    "A)あなたの仕事についてうかがいます",
+                    "B)最近1か月間のあなたの状態についてうかがいます",
+                    "C)あなたの周りの方々についてうかがいます",
+                    "D)満足度についてうかがいます",
+                    "E-H)仕事・職場・会社について"
+                  ), #設問の名前
+                  list(
+                    c("そうだ","まあそうだ","ややちがう","ちがう"),
+                    c("ほとんどなかった","ときどきあった","しばしばあった","ほとんどいつもあった"),
+                    c("非常に","かなり","多少","まったくない"),
+                    c("満足","まあ満足","やや不満足","不満足"),
+                    c("そうだ","まあそうだ","ややちがう","ちがう")
+                  ) #選択のベクトル
+                ), ~{
+                  div(
+                    fluidRow(
+                      style = "margin-top:20pt; display: flex;",
+                      column(width = 2, 
+                             style = "align-self: flex-start",
+                             ..2),
+                      column(width = 2, selectInput(inputId = ns(paste0("oavmap_",..1,"1")), label = ..3[1], choices = c())),
+                      column(width = 2, selectInput(inputId = ns(paste0("oavmap_",..1,"2")), label = ..3[2], choices = c())),
+                      column(width = 2, selectInput(inputId = ns(paste0("oavmap_",..1,"3")), label = ..3[3], choices = c())),
+                      column(width = 2, selectInput(inputId = ns(paste0("oavmap_",..1,"4")), label = ..3[4], choices = c())),
+                      column(width = 2, 
+                             style = "align-self: flex-end;",
+                             actionButton(inputId = ns(paste0("oavmap_",..1,"_admit")), label = "上書き設定"))
+                    ),
+                    hr()  
+                  )
+                })
+              )
+            )
           )
         ),
         hr(),
@@ -137,7 +170,6 @@ wizard_module_ui <- function(id) {
 wizard_module_server <- function(id, year_label) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns # 名前空間関数をサーバー内で取得
-    
     # --- リアクティブ値の初期化 ---
     rv <- reactiveValues(
       wizard_step = 1,
@@ -183,7 +215,7 @@ wizard_module_server <- function(id, year_label) {
       )
     })
     
-    # --- ステップ1: CSVアップロード ---
+    # --- ステップ1: CSVアップロード ------------
     observeEvent(input$csv_file_input, {
       req(input$csv_file_input)
       tryCatch({
@@ -221,7 +253,7 @@ wizard_module_server <- function(id, year_label) {
       }
     })
     
-    # --- ステップ2: 列名マッピング ---
+    # --- ステップ2: 列名マッピング ---------------------
     # NBJSQ列マッピングUI
     header_first_numbers <- reactive({as.numeric(str_extract(rv$csv_headers,"\\d+"))})
     observe({
@@ -324,7 +356,7 @@ wizard_module_server <- function(id, year_label) {
       rv$wizard_step <- 3
     })
     
-    # --- ステップ3: 値マッピング ---
+    # --- ステップ3: 値マッピング -----------------------------
     get_unique_values_from_mapped_column <- function(mapped_column_name_in_rv_list_element) {
       # mapped_column_name_in_rv_list_element は rv$column_map_gender や rv$column_map_nbjsq[['q1']] のような実際の列名を指す
       req(rv$csv_data, mapped_column_name_in_rv_list_element)
