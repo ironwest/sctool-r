@@ -370,8 +370,7 @@ wizard_module_server <- function(id, year_label) {
           }
           
           lapply(1:80, function(i) {
-            q_id <- paste0("q",i)
-            updateSelectInput(session, paste0("map_nbjsq_", q_id), selected = rv$column_map_nbjsq[[q_id]] %||% "")
+            updateSelectInput(session, paste0("colmap_nbjsq_", i), selected = rv$column_map_nbjsq[[i]] %||% "")
           })
         }
         showNotification(paste0(year_label, "の列マッピング設定を読み込みました。"), type = "message", session = session)
@@ -413,7 +412,10 @@ wizard_module_server <- function(id, year_label) {
       }
     )
     
+    ## 前に戻るボタン----------------
     observeEvent(input$back_to_step1_button, { rv$wizard_step <- 1 })
+    
+    ## 次に進むボタン-------------------
     observeEvent(input$goto_step3_button, {
       rv$column_map_age <- input$map_age_column %||% ""
       rv$column_map_gender <- input$map_gender_column %||% ""
@@ -421,8 +423,7 @@ wizard_module_server <- function(id, year_label) {
       rv$column_map_dept2 <- input$map_dept2_column %||% ""
       current_nbjsq_map_list <- list()
       for(i in 1:80) {
-        q_id <- paste0("q", i)
-        current_nbjsq_map_list[[q_id]] <- input[[paste0("map_nbjsq_", q_id)]] %||% ""
+        current_nbjsq_map_list[[i]] <- input[[paste0("colmap_nbjsq_", i)]] %||% ""
       }
       rv$column_map_nbjsq <- current_nbjsq_map_list
       rv$wizard_step <- 3
@@ -633,16 +634,75 @@ wizard_module_server <- function(id, year_label) {
     
     # ステップ3のナビゲーションボタン
     observeEvent(input$back_to_step2_button, { rv$wizard_step <- 2 })
-    observeEvent(input$finish_setup_button, {
-      # 最終保存処理はdownloadHandlerに任せているので、ここでは完了メッセージのみ
-      # 必要なら、ここでもUIからrvへの最終的な値の移し替えを行う
+    
+    # 最終決定のボタン後の処理 -----------------
+    observeEvent(input$finish_setup_button, { # または適切なトリガー
+      req(rv$csv_data, rv$column_map_nbjsq, rv$value_map_nbjsq_individual) # 必要な設定が完了しているか
+      browser()
+      # 1. 元データ (rv$csv_data) を取得
+      raw_data <- rv$csv_data
+      
+      #2. 列名マッピングの適用
+       name_map <- c(rv$column_map_age, rv$column_map_gender, rv$column_map_dept1, rv$column_map_dept2, rv$column_map_nbjsq) |> 
+         as.character() |> 
+         setNames(c("age","gender","dept1","dept2",str_c("q",1:80)))
+       
+       processed_data <- raw_data |>
+         dplyr::select(!!!name_map)
+       
+       processed_data2<-processed_data |> 
+         dplyr::mutate(
+           gender = factor(gender, levels = c(rv$value_map_gender$male, rv$value_map_gender$female), labels = c("男","女"))
+         )
+       browser()
+       for(i in 1:80){
+         processed_data2 <- processed_data2 |> 
+           mutate(!!rlang::sum("q1") := case_when(TRUE ~ 1))
+       }
+       
+       processed_data2
+       rv$value_map_nbjsq_individual[["q1"]][1,1]
+       rv$value_map_nbjsq_individual[["q1"]][2,1]
+       rv$value_map_nbjsq_individual[["q1"]][3,1]
+       rv$value_map_nbjsq_individual[["q1"]][4,1]
+       
+      # 3. 値マッピングの適用
+      #    rv$value_map_gender, rv$value_map_nbjsq_individual などを使って、
+      #    各列の値を標準化します (例: "1" を "男性" に、"2" を "女性" に変換、
+      #    ストレスチェックの回答を点数に変換するなど)。
+      #    dplyr::mutate と dplyr::case_when やマージ処理などが役立ちます。
+      #    例 (性別):
+      #    processed_data <- processed_data |>
+      #      dplyr::mutate(
+      #        Gender_Std = dplyr::case_when(
+      #          Gender == rv$value_map_gender$male   ~ "男性",
+      #          Gender == rv$value_map_gender$female ~ "女性",
+      #          TRUE                                 ~ NA_character_ # または元の値を保持
+      #        )
+      #      )
+      #    例 (NBJSQの質問 - Q1を点数化すると仮定):
+      #    # rv$value_map_nbjsq_individual[['q1']] は4つのCSV値のリスト (例: そうだ, まあそうだ, ややちがう, ちがう に対応するCSV値)
+      #    # これらを点数 (例: 4, 3, 2, 1) にマッピングする
+      #    score_map_q1 <- stats::setNames(c(4, 3, 2, 1), rv$value_map_nbjsq_individual[['q1']])
+      #    processed_data <- processed_data |>
+      #      dplyr::mutate(
+      #        Q1_Score = dplyr::recode(Q1, !!!score_map_q1, .default = NA_real_)
+      #      )
+      
+      # 4. 最終的な処理済み tibble を rv に格納
+      #    rv$processed_tibble(processed_data) # reactiveVal の場合
+      #    rv$processed_data <- processed_data # reactiveValues の場合 (こちらの方が自然かも)
+      #    rv$csv_data <- processed_data # もし rv$csv_data を最終成果物として上書きするなら
+      
+      # (設定完了のモーダル表示など)
       showModal(modalDialog(
-        title = paste0(year_label, " 設定完了"),
-        paste0(year_label, "のデータ設定が完了しました。分析に進む準備ができました。"),
+        title = paste0(year_label, " データ処理完了"),
+        paste0(year_label, "のデータが分析可能な形式に整形されました。"),
         footer = modalButton("閉じる")
       ))
-      rv$wizard_step <- 4 # or a specific "completed" step like 4
+      # rv$wizard_step を更新して、分析画面への遷移を促すなど
     })
+    
     
     return(
       list(
@@ -705,8 +765,12 @@ server <- function(input, output, session) {
     browser()
     if (current_year_results$is_setup_complete()) {
       cat("今年度の設定が完了しました。\n")
+      current_year_results$get_csv_data()
+      current_year_results$get_column_map()
+      current_year_results$get_value_map()
+      current_year_results$is_setup_complete()
       print(str(current_year_results$get_column_map()))
-      write_rds(current_year_results, "temp.rds")
+      
       # print(str(current_year_results$get_value_map()))
     }
   })
