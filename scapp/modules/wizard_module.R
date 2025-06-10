@@ -154,9 +154,10 @@ wizard_module_ui <- function(id) {
           )
         ),
         hr(),
-        h4("年齢、性別、所属の列設定"),
+        h4("社員番号,年齢、性別、所属の列設定"),
         wellPanel(
           fluidRow(
+            column(width = 3, selectInput(ns("map_empid_column"), "社員番号に対応する列:", choices = c("未選択" = ""))),
             column(width = 3, selectInput(ns("map_age_column"), "年齢に対応する列:", choices = c("未選択" = ""))),
             column(width = 3, selectInput(ns("map_gender_column"), "性別に対応する列:", choices = c("未選択" = ""))),
             column(width = 3, selectInput(ns("map_dept1_column"), "部署(大分類)に対応する列:", choices = c("未選択" = ""))),
@@ -231,9 +232,27 @@ wizard_module_ui <- function(id) {
         hr(),
         actionButton(ns("back_to_step2_button"), "戻る：列名マッピング", icon = icon("arrow-left")),
         actionButton(ns("finish_setup_button"), "設定完了", class = "btn-success", icon = icon("check"))
+      )),
+      
+      ## ステップ4: データ加工の終了と分析画面への ----------------------
+      conditionalPanel(
+        condition = paste0("output['", ns("wizard_show_step4"), "'] == true"),
+        div(
+          id = ns("step4_ui"),
+          h3("ステップ4: データの取り込みの完了"),
+          p("データの取り込みと変換が完了いたしました。"),
+          p("変換されたデータは、以下のボタンからダウンロードしておけば、次回以降、変換作業は必要なくなります。"),
+          p("2年度分のデータの取り込みが終了していれば、左のメニューから「分析」いただけます。"),
+          fluidRow(
+            
+            column(width = 6,
+                   style = "margin-top: 25px;",
+                   downloadButton(ns("processed_data_save_button"), "変換されたデータをCSVとして保存")
+            )
+          )
+        )
       )
     )
-  )
 }
 
 
@@ -242,7 +261,7 @@ wizard_module_ui <- function(id) {
 wizard_module_server <- function(id, year_label) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns # 名前空間関数をサーバー内で取得
-    # --- リアクティブ値の初期化 ---
+    # --- リアクティブ値の初期化 ----
     rv <- reactiveValues(
       wizard_step = 1,
       csv_data = NULL,
@@ -265,23 +284,25 @@ wizard_module_server <- function(id, year_label) {
       value_map_nbjsq_individual = stats::setNames(lapply(1:80, function(x) rep(list(""), 4)), paste0("q", 1:80))
     )
     
-    # --- ウィザードステップ表示制御 ---
+    # --- ウィザードステップ表示制御 ----
     output$wizard_show_step1 <- reactive({ rv$wizard_step == 1 })
     output$wizard_show_step2 <- reactive({ rv$wizard_step == 2 })
     output$wizard_show_step3 <- reactive({ rv$wizard_step == 3 })
+    output$wizard_show_step4 <- reactive({ rv$wizard_step == 4 })
     outputOptions(output, "wizard_show_step1", suspendWhenHidden = FALSE)
     outputOptions(output, "wizard_show_step2", suspendWhenHidden = FALSE)
     outputOptions(output, "wizard_show_step3", suspendWhenHidden = FALSE)
+    outputOptions(output, "wizard_show_step4", suspendWhenHidden = FALSE)
     
-    # --- ウィザード進捗インジケーター ---
+    # --- ウィザード進捗インジケーター ----
     output$wizard_step_indicator_ui <- renderUI({
-      step_names <- c("1. CSVアップロード", "2. 列名マッピング", "3. 値マッピング")
+      step_names <- c("1. CSVアップロード", "2. 列名マッピング", "3. 値マッピング", "4. 完了")
       current_step_name <- step_names[rv$wizard_step]
       tagList(
         h4(paste0(year_label, " 設定 - 現在のステップ: ", current_step_name)),
         div(style = "background-color: #eee; border-radius: 5px; height: 20px;",
-            div(style = paste0("background-color: #337ab7; width:", (rv$wizard_step/3)*100, "%; height: 100%; border-radius: 5px; text-align: center; color: white; line-height: 20px;"),
-                paste0(round((rv$wizard_step/3)*100), "%")
+            div(style = paste0("background-color: #337ab7; width:", (rv$wizard_step/4)*100, "%; height: 100%; border-radius: 5px; text-align: center; color: white; line-height: 20px;"),
+                paste0(round((rv$wizard_step/4)*100), "%")
             )
         )
       )
@@ -296,6 +317,7 @@ wizard_module_server <- function(id, year_label) {
         rv$csv_headers <- colnames(df)
         # 列マッピング用selectInputの選択肢を更新
         header_choices <- c("未選択" = "", stats::setNames(rv$csv_headers, rv$csv_headers))
+        updateSelectInput(session, "map_empid_column", choices = header_choices, selected = rv$column_map_empid)
         updateSelectInput(session, "map_age_column", choices = header_choices, selected = rv$column_map_age)
         updateSelectInput(session, "map_gender_column", choices = header_choices, selected = rv$column_map_gender)
         updateSelectInput(session, "map_dept1_column", choices = header_choices, selected = rv$column_map_dept1)
@@ -351,10 +373,12 @@ wizard_module_server <- function(id, year_label) {
         config <- jsonlite::fromJSON(input$col_map_config_load_input$datapath)
         header_choices <- c("未選択" = "", stats::setNames(rv$csv_headers, rv$csv_headers))
         
+        rv$column_map_empid <- config$basic_attributes$empid %||% ""
         rv$column_map_age <- config$basic_attributes$age %||% ""
         rv$column_map_gender <- config$basic_attributes$gender %||% ""
         rv$column_map_dept1 <- config$basic_attributes$dept1 %||% ""
         rv$column_map_dept2 <- config$basic_attributes$dept2 %||% ""
+        updateSelectInput(session, "map_empid_column", choices = header_choices, selected = rv$column_map_empid)
         updateSelectInput(session, "map_age_column", choices = header_choices, selected = rv$column_map_age)
         updateSelectInput(session, "map_gender_column", choices = header_choices, selected = rv$column_map_gender)
         updateSelectInput(session, "map_dept1_column", choices = header_choices, selected = rv$column_map_dept1)
@@ -385,6 +409,7 @@ wizard_module_server <- function(id, year_label) {
         paste0("column_mapping_config_", year_label, "_", Sys.Date(), ".json")
       },
       content = function(file) {
+        rv$column_map_empid <- input$map_empid_column %||% ""
         rv$column_map_age <- input$map_age_column %||% ""
         rv$column_map_gender <- input$map_gender_column %||% ""
         rv$column_map_dept1 <- input$map_dept1_column %||% ""
@@ -417,6 +442,7 @@ wizard_module_server <- function(id, year_label) {
     
     ## 次に進むボタン-------------------
     observeEvent(input$goto_step3_button, {
+      rv$column_map_empid <- input$map_empid_column %||% ""
       rv$column_map_age <- input$map_age_column %||% ""
       rv$column_map_gender <- input$map_gender_column %||% ""
       rv$column_map_dept1 <- input$map_dept1_column %||% ""
@@ -635,10 +661,10 @@ wizard_module_server <- function(id, year_label) {
     # ステップ3のナビゲーションボタン
     observeEvent(input$back_to_step2_button, { rv$wizard_step <- 2 })
     
-    # 最終決定のボタン後の処理 -----------------
+    # --- ステップ4: 最終決定後の処理 -----------------------------
     observeEvent(input$finish_setup_button, { # または適切なトリガー
       req(rv$csv_data, rv$column_map_nbjsq, rv$value_map_nbjsq_individual) # 必要な設定が完了しているか
-      browser()
+      
       # 1. 元データ (rv$csv_data) を取得
       raw_data <- rv$csv_data
       
@@ -647,52 +673,27 @@ wizard_module_server <- function(id, year_label) {
          as.character() |> 
          setNames(c("age","gender","dept1","dept2",str_c("q",1:80)))
        
-       processed_data <- raw_data |>
-         dplyr::select(!!!name_map)
+       processed_data <- raw_data |> dplyr::select(!!!name_map)
        
-       processed_data2<-processed_data |> 
+      # 3. 値マッピングの適用
+       processed_data <- processed_data |> 
          dplyr::mutate(
            gender = factor(gender, levels = c(rv$value_map_gender$male, rv$value_map_gender$female), labels = c("男","女"))
          )
-       browser()
-       for(i in 1:80){
-         processed_data2 <- processed_data2 |> 
-           mutate(!!rlang::sum("q1") := case_when(TRUE ~ 1))
-       }
        
-       processed_data2
-       rv$value_map_nbjsq_individual[["q1"]][1,1]
-       rv$value_map_nbjsq_individual[["q1"]][2,1]
-       rv$value_map_nbjsq_individual[["q1"]][3,1]
-       rv$value_map_nbjsq_individual[["q1"]][4,1]
-       
-      # 3. 値マッピングの適用
-      #    rv$value_map_gender, rv$value_map_nbjsq_individual などを使って、
-      #    各列の値を標準化します (例: "1" を "男性" に、"2" を "女性" に変換、
-      #    ストレスチェックの回答を点数に変換するなど)。
-      #    dplyr::mutate と dplyr::case_when やマージ処理などが役立ちます。
-      #    例 (性別):
-      #    processed_data <- processed_data |>
-      #      dplyr::mutate(
-      #        Gender_Std = dplyr::case_when(
-      #          Gender == rv$value_map_gender$male   ~ "男性",
-      #          Gender == rv$value_map_gender$female ~ "女性",
-      #          TRUE                                 ~ NA_character_ # または元の値を保持
-      #        )
-      #      )
-      #    例 (NBJSQの質問 - Q1を点数化すると仮定):
-      #    # rv$value_map_nbjsq_individual[['q1']] は4つのCSV値のリスト (例: そうだ, まあそうだ, ややちがう, ちがう に対応するCSV値)
-      #    # これらを点数 (例: 4, 3, 2, 1) にマッピングする
-      #    score_map_q1 <- stats::setNames(c(4, 3, 2, 1), rv$value_map_nbjsq_individual[['q1']])
-      #    processed_data <- processed_data |>
-      #      dplyr::mutate(
-      #        Q1_Score = dplyr::recode(Q1, !!!score_map_q1, .default = NA_real_)
-      #      )
-      
+       processed_data <- processed_data |> 
+         mutate(across(matches("q\\d+"), ~{
+           case_when(
+             .x == rv$value_map_nbjsq_individual[[cur_column()]][[1]] ~ 1,
+             .x == rv$value_map_nbjsq_individual[[cur_column()]][[2]] ~ 2,
+             .x == rv$value_map_nbjsq_individual[[cur_column()]][[3]] ~ 3,
+             .x == rv$value_map_nbjsq_individual[[cur_column()]][[4]] ~ 4,
+             TRUE ~ NA_real_
+           )
+          })) 
+         
       # 4. 最終的な処理済み tibble を rv に格納
-      #    rv$processed_tibble(processed_data) # reactiveVal の場合
-      #    rv$processed_data <- processed_data # reactiveValues の場合 (こちらの方が自然かも)
-      #    rv$csv_data <- processed_data # もし rv$csv_data を最終成果物として上書きするなら
+      rv$processed_data <- processed_data 
       
       # (設定完了のモーダル表示など)
       showModal(modalDialog(
@@ -700,13 +701,34 @@ wizard_module_server <- function(id, year_label) {
         paste0(year_label, "のデータが分析可能な形式に整形されました。"),
         footer = modalButton("閉じる")
       ))
-      # rv$wizard_step を更新して、分析画面への遷移を促すなど
+      
+      rv$wizard_step <- 4
+      
     })
+    
+    output$processed_data_save_button <- downloadHandler(
+      filename = function() {
+        
+        fn <- paste0("processed_", input$csv_file_input$name)
+        if(str_detect(fn,"\\.csv")){
+          # .csv extension present.
+        }else{
+          fn <- paste0(fn,".csv")
+        }
+        
+        return(fn)
+      },
+      content = function(file) {
+        
+        readr::write_csv(rv$processed_data,file)
+      }
+    )
     
     
     return(
       list(
         get_csv_data = reactive({ rv$csv_data }),
+        get_processed_data = reactive({ rv$processed_data}),
         get_column_map = reactive({ 
           list(
             age = rv$column_map_age, gender = rv$column_map_gender,
@@ -721,7 +743,7 @@ wizard_module_server <- function(id, year_label) {
             nbjsq_individual = rv$value_map_nbjsq_individual
           )
         }),
-        is_setup_complete = reactive({ rv$wizard_step > 3 }) 
+        is_setup_complete = reactive({ rv$wizard_step == 4 }) 
       )
     )
   })
@@ -762,7 +784,7 @@ server <- function(input, output, session) {
   # モジュールの返り値を利用する例 (デバッグ用)
   observe({
     req(current_year_results$is_setup_complete()) # setupが完了したら
-    browser()
+    
     if (current_year_results$is_setup_complete()) {
       cat("今年度の設定が完了しました。\n")
       current_year_results$get_csv_data()
