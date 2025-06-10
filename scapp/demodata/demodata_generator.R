@@ -41,11 +41,11 @@ generate_nbjsq_dummy_data <- function(N) {
   # 各質問項目をQ1, Q2, ..., Q57とします。
   # 回答尺度は例として 1:そうだ, 2:まあそうだ, 3:ややちがう, 4:ちがう と仮定します。
   # 実際の調査票の回答の向き（点数が高いほどストレスが高い/低いなど）に応じて調整してください。
-  nbjsq_items <- data.frame(matrix(NA, nrow = N, ncol = 57))
+  nbjsq_items <- data.frame(matrix(NA, nrow = N, ncol = 80))
   for (i in 1:80) {
     # 各項目で回答の傾向を少し変えたい場合は、prob引数で調整可能
     # 例: sample(1:4, N, replace = TRUE, prob = c(0.1, 0.2, 0.3, 0.4))
-    nbjsq_items[, i] <- sample(1:4, N, replace = TRUE)
+    nbjsq_items[, i] <- sample(c(letters[1:4]), N, replace = TRUE)
     colnames(nbjsq_items)[i] <- paste0("質問", i)
   }
   
@@ -69,7 +69,7 @@ nbjsq_data1 <- generate_nbjsq_dummy_data(3500)
 nbjsq_data2 <- generate_nbjsq_dummy_data(3700)
 
 # 生成されたデータの最初の数行を表示
-print(head(nbjsq_data))
+print(head(nbjsq_data1))
 
 # 生成されたデータの要約統計量を表示
 # summary(nbjsq_data)
