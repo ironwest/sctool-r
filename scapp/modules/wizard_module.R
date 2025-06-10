@@ -16,9 +16,6 @@ library(tidyr)
 #値マッピング用で利用する質問番号の順番に質問の文章が含まれるベクトル
 qtext <- read_csv("nbjsq_question_text.csv") |> dplyr::pull(qtext)
 
-
-
-
 # --- ウィザードモジュール UI (wizard_module_ui) ---
 # (前の回答で提供された wizard_module_ui のコードをここに記述)
 wizard_module_ui <- function(id) {
@@ -257,7 +254,6 @@ wizard_module_ui <- function(id) {
 
 
 # --- ウィザードモジュール サーバー (wizard_module_server) ---
-# (前の回答で提供された wizard_module_server のコードをここに記述)
 wizard_module_server <- function(id, year_label) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns # 名前空間関数をサーバー内で取得
@@ -266,12 +262,15 @@ wizard_module_server <- function(id, year_label) {
       wizard_step = 1,
       csv_data = NULL,
       csv_headers = NULL,
+      
       # 列マッピング (標準名 = CSV列名)
-      column_map_age = "", # 初期値は空文字やNULL
+      column_map_empid = "", 
+      column_map_age = "", 
       column_map_gender = "",
       column_map_dept1 = "",
       column_map_dept2 = "",
       column_map_nbjsq = stats::setNames(vector("list", 80), paste0("q", 1:80)), # 名前付きリスト
+      
       # 値マッピング
       value_map_gender = list(male = "", female = ""),
       value_map_nbjsq_bulk = list(
@@ -315,8 +314,10 @@ wizard_module_server <- function(id, year_label) {
         df <- readr::read_csv(file=input$csv_file_input$datapath)
         rv$csv_data <- df
         rv$csv_headers <- colnames(df)
+        
         # 列マッピング用selectInputの選択肢を更新
         header_choices <- c("未選択" = "", stats::setNames(rv$csv_headers, rv$csv_headers))
+        updateSelectInput(session, "map_empid_column", choices = header_choices, selected = rv$column_map_empid)
         updateSelectInput(session, "map_empid_column", choices = header_choices, selected = rv$column_map_empid)
         updateSelectInput(session, "map_age_column", choices = header_choices, selected = rv$column_map_age)
         updateSelectInput(session, "map_gender_column", choices = header_choices, selected = rv$column_map_gender)
@@ -326,6 +327,7 @@ wizard_module_server <- function(id, year_label) {
         output$csv_upload_status_text <- renderText({
           paste(year_label, "ファイル読み込み成功:", nrow(df), "行、", ncol(df), "列検出。")
         })
+        
         output$csv_preview_table <- renderDataTable({
           head(df, 5)
         }, options = list(scrollX = TRUE, pageLength = 5, searching = FALSE, lengthChange = FALSE))
@@ -374,6 +376,7 @@ wizard_module_server <- function(id, year_label) {
         header_choices <- c("未選択" = "", stats::setNames(rv$csv_headers, rv$csv_headers))
         
         rv$column_map_empid <- config$basic_attributes$empid %||% ""
+        rv$column_map_empid <- config$basic_attributes$empid %||% ""
         rv$column_map_age <- config$basic_attributes$age %||% ""
         rv$column_map_gender <- config$basic_attributes$gender %||% ""
         rv$column_map_dept1 <- config$basic_attributes$dept1 %||% ""
@@ -410,6 +413,7 @@ wizard_module_server <- function(id, year_label) {
       },
       content = function(file) {
         rv$column_map_empid <- input$map_empid_column %||% ""
+        rv$column_map_empid <- input$map_empid_column %||% ""
         rv$column_map_age <- input$map_age_column %||% ""
         rv$column_map_gender <- input$map_gender_column %||% ""
         rv$column_map_dept1 <- input$map_dept1_column %||% ""
@@ -426,6 +430,7 @@ wizard_module_server <- function(id, year_label) {
         
         current_config <- list(
           basic_attributes = list(
+            empid = rv$column_map_empid,
             age = rv$column_map_age,
             gender = rv$column_map_gender,
             dept1 = rv$column_map_dept1,
@@ -442,6 +447,7 @@ wizard_module_server <- function(id, year_label) {
     
     ## 次に進むボタン-------------------
     observeEvent(input$goto_step3_button, {
+      rv$column_map_empid <- input$map_empid_column %||% ""
       rv$column_map_empid <- input$map_empid_column %||% ""
       rv$column_map_age <- input$map_age_column %||% ""
       rv$column_map_gender <- input$map_gender_column %||% ""
