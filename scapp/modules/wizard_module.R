@@ -675,9 +675,11 @@ wizard_module_server <- function(id, year_label) {
       raw_data <- rv$csv_data
       
       #2. 列名マッピングの適用
-       name_map <- c(rv$column_map_age, rv$column_map_gender, rv$column_map_dept1, rv$column_map_dept2, rv$column_map_nbjsq) |> 
+       name_map <- c(rv$column_map_empid , rv$column_map_age  , 
+                     rv$column_map_gender, rv$column_map_dept1, 
+                     rv$column_map_dept2 , rv$column_map_nbjsq ) |> 
          as.character() |> 
-         setNames(c("age","gender","dept1","dept2",str_c("q",1:80)))
+         setNames(c("empid","age","gender","dept1","dept2",str_c("q",1:80)))
        
        processed_data <- raw_data |> dplyr::select(!!!name_map)
        
@@ -697,8 +699,13 @@ wizard_module_server <- function(id, year_label) {
              TRUE ~ NA_real_
            )
           })) 
+       
+       # 4.各種スコアの計算
+       # processed_data <<- processed_data
+       # write_rds(processed_data, "temp.rds", compress="gz") #開発用に一時的に保存
+       # calculate_scores 関数を作成して、それをここで適応する。
          
-      # 4. 最終的な処理済み tibble を rv に格納
+      # 5. 最終的な処理済み tibble を rv に格納
       rv$processed_data <- processed_data 
       
       # (設定完了のモーダル表示など)
