@@ -10,7 +10,7 @@ library(dplyr)
 library(tidyr)
 
 # マッピング後のデータからスコア計算を行う関数の読み込み
-
+source("calculate_scores.R")
 
 # `%||%` 演算子 (NULL の場合にデフォルト値を返すヘルパー)
 `%||%` <- function(a, b) if (!is.null(a)) a else b
@@ -707,6 +707,7 @@ wizard_module_server <- function(id, year_label) {
        # processed_data <<- processed_data
        # write_rds(processed_data, "temp.rds", compress="gz") #開発用に一時的に保存
        # 関数を作成して、それをここで適応する。
+       processed_data <- calculate_scores(processed_data)
          
       # 5. 最終的な処理済み tibble を rv に格納
       rv$processed_data <- processed_data 
