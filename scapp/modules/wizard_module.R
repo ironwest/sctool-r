@@ -689,7 +689,7 @@ wizard_module_server <- function(id, year_label) {
       # 3. 値マッピングの適用
        processed_data <- processed_data |> 
          dplyr::mutate(
-           gender = factor(gender, levels = c(rv$value_map_gender$male, rv$value_map_gender$female), labels = c("男","女"))
+           gender = factor(gender, levels = c(rv$value_map_gender$male, rv$value_map_gender$female), labels = c("男性","女性"))
          )
        
        processed_data <- processed_data |> 
