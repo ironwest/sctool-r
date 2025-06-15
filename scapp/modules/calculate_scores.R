@@ -82,10 +82,24 @@ calculate_scores <- function(d){
       A+C >= 76 & B>=63 ~ TRUE,
       TRUE ~ FALSE
     ))
+  
+  
+  #総合健康リスクの計算時に利用するdemand、control、supportのスコア計算
+  #このスコアは、回答を逆順にした点数が利用されることに注意。
+  sumscore <- d |> 
+    select(tempid, matches("q(1|2|3|8|9|10|47|50|53|48|51|54)$")) |> 
+    mutate(across(matches("q"), ~5-.)) |> 
+    mutate(demand = q1+q2+q3,
+           control = q8+q9+q10,
+           boss_support = q47+q50+q53,
+           fellow_support = q48+q51+q54) |> 
+    select(tempid, demand, control, boss_support, fellow_support)
+  
 
   dfin <- d |> 
     left_join(hs_scores, by="tempid") |> 
     left_join(scoredata, by="tempid") |> 
+    left_join(sumscore, by="tempid") |> 
     mutate(age_kubun = case_when(
       between(age,0 ,19) ~ "10代",
       between(age,20,29) ~ "20代",

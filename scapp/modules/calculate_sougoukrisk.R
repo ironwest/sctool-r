@@ -10,30 +10,22 @@
 #          𝛽7 ∗ (女性比率）
 
 
-#総合健康リスクは平均ではなく、合計点の部署ごとの計算を行うため、それようの計算を行う
+#総合健康リスクは平均ではなく、合計点の部署ごとの計算を行うため、その計算を行う
 #なお、ここでの計算にはすべて「逆転した点数の総和」を用いることに注意が必要
 
 d <- read_csv("../demodata/processed_nbjsq_dummy_data1_alpha.csv")
 
 sumscore <- d |> 
-  mutate(score = 5- value) |> 
-  filter(nbjsq %in% c(
-    1, #vol
-    2,
-    3,
-    8, #control
-    9,
-    10, 
-    47,50,53, #boss,
-    48,51,54 #fellow
-  )) |> 　
-  mutate(syakudogrp = factor(nbjsq, 
-                             levels = c(1,2,3,8,9,10,47,50,53,48,51,54),
-                             labels = c(rep("demand",3),rep("control",3),rep("boss_support",3),rep("fellow_support",3)))) |> 
-  group_by(empid, syakudogrp) |> 
-  filter(!is.na(score)) |> #ここでfilterをかけないとおかしい結果になる(回答していない人を割ってしまっている！)
-  summarise(sumscore = sum(score)) |> ungroup()
+  select(tempid, matches("q(1|2|3|8|9|10|47|50|53|48|51|54)$")) |> 
+  mutate(across(matches("q"), ~5-.)) |> 
+  mutate(demand = q1+q2+q3,
+         control = q8+q9+q10,
+         boss_support = q47+q50+q53,
+         fellow_support = q48+q51+q54) |> 
+  select(tempid, demand, control, boss_support, fellow_support)
 
+d <- d |> 
+  left_join(sumscore, by="tempid")
 
 sc_averages_for_risk <- base |> 
   left_join(sumscore, by="empid") |> 
