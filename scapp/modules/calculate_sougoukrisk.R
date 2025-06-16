@@ -9,131 +9,99 @@
 #          𝛽6∗ (年代平均) + 
 #          𝛽7 ∗ (女性比率）
 
-
-#総合健康リスクは平均ではなく、合計点の部署ごとの計算を行うため、その計算を行う
-#なお、ここでの計算にはすべて「逆転した点数の総和」を用いることに注意が必要
-
-d <- read_csv("../demodata/processed_nbjsq_dummy_data1_alpha.csv")
-
-sumscore <- d |> 
-  select(tempid, matches("q(1|2|3|8|9|10|47|50|53|48|51|54)$")) |> 
-  mutate(across(matches("q"), ~5-.)) |> 
-  mutate(demand = q1+q2+q3,
-         control = q8+q9+q10,
-         boss_support = q47+q50+q53,
-         fellow_support = q48+q51+q54) |> 
-  select(tempid, demand, control, boss_support, fellow_support)
-
-d <- d |> 
-  left_join(sumscore, by="tempid")
-
-sc_averages_for_risk <- base |> 
-  left_join(sumscore, by="empid") |> 
-  group_by(grp, syakudogrp) |> 
-  summarise(mean_score = mean(sumscore)) |> 
-  ungroup() |> 
-  pivot_wider(id_cols = grp, names_from = syakudogrp, values_from = mean_score)
+# calculate_kenkourisk(
+#   d = current_data,
+#   grp_vars = group_vars,
+#   tgtgyousyu = "全産業"
+# )
 
 
-sc_averages_for_risk_overall <- base |> 
-  left_join(sumscore, by="empid") |> 
-  mutate(grp = "全体") |> 
-  group_by(grp, syakudogrp) |> 
-  summarise(mean_score = mean(sumscore)) |> 
-  ungroup() |> 
-  pivot_wider(id_cols = grp, names_from = syakudogrp, values_from = mean_score)
+# d <- read_csv("../demodata/processed_nbjsq_dummy_data1_alpha.csv")
+# grp_vars <- c("dept1","dept2")
+# tgtgyousyu <- "全産業"
 
-input_data <- sc_averages_for_risk
-fixed_data <- read_csv("./riskcalc/fixed_data.csv")
-
-#' 総合健康リスク計算の関数
-#' 
-#' @param input_data ストレスチェック結果のデータフレーム（sc_averages_for_risk)
-#' @param fixed_data 業種別平均、係数データ（riskcalc/fixed_data.csvに収納)
-#' @param industry_name 対象業種名
-#' @return リスク結果計算を含むデータフレーム
-calculate_all_risks <- function(input_data, fixed_data, industry_name = "全体"){
+#総合健康リスクを計算する関数
+calculate_sougoukrisk <- function(d, grp_vars, tgtgyousyu){
+  #設定の読み込み
+  risk_calc_setting <- read_csv("../modules/risk_coefficients.csv")
   
-  input_data <- input_data |> 
-    mutate(across(where(is.numeric), ~ round(.x,3)))
+  #指定した業種の係数と、平均値を取得する
+  risk_calc_setting <- risk_calc_setting |> 
+    filter(gyousyu == tgtgyousyu) |> 
+    filter(!is.na(avg)) |> 
+    pivot_wider(id_cols = c(gyousyu, coefname, avg), names_from = type, values_from = coef)
   
-  avg_vals <- fixed_data |> filter(industry == industry_name, type=="avg")
-  coef_vals <- fixed_data |> filter(industry == industry_name, type=="coef")
+  avg <- setNames(risk_calc_setting$avg, risk_calc_setting$coefname)
+  coeflong <- setNames(risk_calc_setting$long, risk_calc_setting$coefname)
+  coefcross <- setNames(risk_calc_setting$cross, risk_calc_setting$coefname)
   
-  if(nrow(avg_vals) == 0 | nrow(coef_vals)==0) stop("指定された業種がfixed_dataに見当たりません")
-  
-  results <- input_data |> 
+  #総合健康リスクを縦断、横断、旧リスクで計算する
+  sougou_kenkou_risk <- d |>
+    select(all_of(grp_vars),demand, control, boss_support, fellow_support) |> 
+    group_by(across(all_of(grp_vars))) |>
+    summarise(
+      demand = mean(demand, na.rm=TRUE), 
+      control = mean(control, na.rm=TRUE), 
+      boss_support = mean(boss_support, na.rm=TRUE), 
+      fellow_support = mean(fellow_support, na.rm=TRUE)
+    ) |> 
     mutate(
+      #longitudinal kenkou risk:
       #Vol-Control (RiskA)
-      risk_A = floor(
+      risk_A_long = floor(
         pmin(
           exp(
-            ((demand - avg_vals$demand) * coef_vals$demand) + ((control - avg_vals$control) * coef_vals$control)
+            ((demand - avg["demand"]) * coeflong["demand"]) + ((control - avg["control"]) * coeflong["control"])
           ) * 100, 350)),
       
       #Support (RiskB)
-      risk_B = floor(
+      risk_B_long = floor(
         pmin(
           exp(
-            ((boss_support - avg_vals$boss) * coef_vals$boss) + ((fellow_support - avg_vals$fellow) * coef_vals$fellow)
+            ((boss_support - avg["boss_support"]) * coeflong["boss_support"]) + ((fellow_support - avg["fellow_support"]) * coeflong["fellow_support"])
           ) * 100, 350)),
       
-      #Total Risk
-      total_risk = floor(risk_A * risk_B / 100),
+      #Total risk
+      total_risk_long = floor(risk_A_long * risk_B_long / 100),
+      
+      #crosssectional kenkou risk:
+      #VOl-control (RiskA)
+      risk_A_cross = floor(
+        pmin(
+          exp(
+            ((demand - avg["demand"]) * coefcross["demand"]) + ((control - avg["control"]) * coefcross["control"])
+          ) * 100, 350)),
+      
+      #Support (RiskB)
+      risk_B_cross = floor(
+        pmin(
+          exp(
+            ((boss_support - avg["boss_support"]) * coefcross["boss_support"]) + ((fellow_support - avg["fellow_support"]) * coefcross["fellow_support"])
+          ) * 100, 350)),
+      
+      #Total risk
+      total_risk_cross = floor(risk_A_cross * risk_B_cross / 100),
       
       risk_A_old = floor(pmin(exp(((demand - 8.7) * 0.076) + (control - 8)*-0.089)*100, 350)),
       risk_B_old = floor(pmin(exp(((boss_support - 7.6) * -0.097) + (fellow_support - 8.1)*-0.097)*100, 350)),
       total_risk_old = floor(risk_A_old * risk_B_old / 100)
-    )
+    ) |> 
+    select(all_of(grp_vars),matches("total"))
   
-  
-  return(results)
-  
-  
+  return(sougou_kenkou_risk)
 }
 
-total_risk_oa_hyou　 <- calculate_all_risks(sc_averages_for_risk_overall, fixed_data) |> 
-  select(grp, total_risk)
-
-total_risk_data <- calculate_all_risks(sc_averages_for_risk, fixed_data) |> 
-  select(grp, total_risk)
-
-total_risk_hyou <- bind_rows(total_risk_oa_hyou, total_risk_data) |> 
-  mutate(name1 = "総合健康リスク") |> 
-  select(grp,name1,value = total_risk)
-
-# 未受診者人数を算出-------------
-nas_hyou_grp <- nbjsq |> 
-  group_by(empid) |> 
-  summarise(nas = all(is.na(value))) |> 
-  left_join(base, by=c("empid")) |> 
-  group_by(grp) |> 
-  summarise(nas = sum(nas))
-
-nas_hyou_oa <- nbjsq |> 
-  group_by(empid) |> 
-  summarise(nas = all(is.na(value))) |> 
-  left_join(base, by=c("empid")) |> 
-  mutate(grp = "全体") |> 
-  group_by(grp) |> 
-  summarise(nas = sum(nas))
-
-nas_hyou <- bind_rows(nas_hyou_oa, nas_hyou_grp) |> 
-  mutate(name1 = "未受検者数(人)") |> 
-  rename(value = nas) |> 
-  relocate(grp,name1,value)
 
 
-#ここまでの結果を結合する
-fin <- bind_rows(
-  hs_hyou,
-  total_risk_hyou,
-  harasment_hyou_data,
-  hensati_hyou_data,
-  nas_hyou
-)
 
-return(fin)
 
-}
+
+
+
+
+
+
+
+
+
 
