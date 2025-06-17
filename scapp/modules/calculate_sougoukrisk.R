@@ -21,7 +21,7 @@
 # tgtgyousyu <- "全産業"
 
 #総合健康リスクを計算する関数
-calculate_sougoukrisk <- function(d, grp_vars, tgtgyousyu){
+calculate_sougoukrisk <- function(d, grp_vars, tgtgyousyu,precise=FALSE){
   #設定の読み込み
   risk_calc_setting <- read_csv("../modules/risk_coefficients.csv")
   
@@ -85,8 +85,14 @@ calculate_sougoukrisk <- function(d, grp_vars, tgtgyousyu){
       risk_A_old = floor(pmin(exp(((demand - 8.7) * 0.076) + (control - 8)*-0.089)*100, 350)),
       risk_B_old = floor(pmin(exp(((boss_support - 7.6) * -0.097) + (fellow_support - 8.1)*-0.097)*100, 350)),
       total_risk_old = floor(risk_A_old * risk_B_old / 100)
-    ) |> 
-    select(all_of(grp_vars),matches("total"))
+    )
+    
+  if(precise){
+    sougou_kenkou_risk
+  }else{
+    sougou_kenkou_risk <- sougou_kenkou_risk |> select(all_of(grp_vars),matches("total"))
+  }
+    
   
   return(sougou_kenkou_risk)
 }

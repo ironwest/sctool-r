@@ -2,7 +2,7 @@ source("calculate_hensati.r")
 source("calculate_scores.r")
 source("calculate_sougoukrisk.r")
 
-calculate_hensati_hyou <- function(current_data, hensati_data, target_sheet, group_vars,nbjsq, nbjsqlabs, target_gyousyu, target_longorcross){
+calculate_hensati_hyou <- function(current_data, hensati_data, target_sheet, group_vars,nbjsq, nbjsqlabs, target_gyousyu, target_longorcross, precise = FALSE){
   
   #偏差値表を作成する
   hyou <- calculate_hensati(
@@ -36,15 +36,25 @@ calculate_hensati_hyou <- function(current_data, hensati_data, target_sheet, gro
   hyouskrisk <- calculate_sougoukrisk(
     d = current_data,
     grp_vars = group_vars,
-    tgtgyousyu = target_gyousyu
+    tgtgyousyu = target_gyousyu,
+    precise=TRUE
   )
   
-  hyouskrisk <- hyouskrisk |> select(all_of(group_vars), matches(target_longorcross))
-  
-  if(target_longorcross == "long"){
-    hyouskrisk <- hyouskrisk |> rename("総合健康リスク" = total_risk_long)
-  }else if(target_longorcross == "cross"){
-    hyouskrisk <- hyouskrisk |> rename("総合健康リスク" = total_risk_cross)
+  if(precise) {
+    #do not select when precise is TRUE
+    if(target_longorcross == "long"){
+      hyouskrisk <- hyouskrisk |> mutate("総合健康リスク" = total_risk_long)
+    }else if(target_longorcross == "cross"){
+      hyouskrisk <- hyouskrisk |> mutate("総合健康リスク" = total_risk_cross)
+    }
+      
+  }else{
+    hyouskrisk <- hyouskrisk |> select(all_of(group_vars), matches(target_longorcross))  
+    if(target_longorcross == "long"){
+      hyouskrisk <- hyouskrisk |> rename("総合健康リスク" = total_risk_long)
+    }else if(target_longorcross == "cross"){
+      hyouskrisk <- hyouskrisk |> rename("総合健康リスク" = total_risk_cross)
+    }
   }
   
   hyou <- hyou |> left_join(hyouskrisk, by=group_vars)

@@ -14,10 +14,13 @@ source("calculate_hensati.R")
 source("calculate_sougoukrisk.R")
 source("calculate_hensati_hyou.R")
 source("setting_hensati_hyou.R")
+source("setting_gh_analysis.R")
 
 hensati_data <- read_csv("table11.csv")
 nbjsq <- read_csv("nbjsq_question_text.csv")
 nbjsqlabs <- read_csv("nbjsq_label_hensati.csv")
+risk_calc_setting <- read_csv("../modules/risk_coefficients.csv")
+
 skrisk_gyousyu <- c(
   "全産業",
   "医療・福祉",
@@ -153,7 +156,8 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
         nbjsq = nbjsq, 
         nbjsqlabs = nbjsqlabs,
         target_gyousyu = input$gyousyu,
-        target_longorcross = input$long_or_cross
+        target_longorcross = input$long_or_cross,
+        precise=TRUE
       )
       
       hyou_oa_now <- data_now |> 
@@ -165,7 +169,8 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
           nbjsq = nbjsq, 
           nbjsqlabs = nbjsqlabs,
           target_gyousyu = input$gyousyu,
-          target_longorcross = input$long_or_cross
+          target_longorcross = input$long_or_cross,
+          precise=TRUE
         )
       
       hyou_past <- calculate_hensati_hyou(
@@ -176,7 +181,8 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
         nbjsq = nbjsq, 
         nbjsqlabs = nbjsqlabs,
         target_gyousyu = input$gyousyu,
-        target_longorcross = input$long_or_cross
+        target_longorcross = input$long_or_cross,
+        precise=TRUE
       )
       
       hyou_oa_past <- data_past |> 
@@ -188,7 +194,8 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
           nbjsq = nbjsq, 
           nbjsqlabs = nbjsqlabs,
           target_gyousyu = input$gyousyu,
-          target_longorcross = input$long_or_cross
+          target_longorcross = input$long_or_cross,
+          precise=TRUE
         )
       
       hyou_oa_now  <<- hyou_oa_now
@@ -221,11 +228,15 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
       analysis_target_tibble #基本とBJSQは独自、アウトカム、資源、その他は同じ処理でOK
 
       #基本‐基本
-      select_these <- c("受検人数","不完全回答人数","高ストレス者人数","高ストレス者割合")
-      percent_this <- c("高ストレス者割合")
-      target_grp_name <- "マーケット戦略部"
-      
       make_gh_result <- function(hyou_oa_now, hyou_now, target_grp_name, select_these, plot_this, percent_this = NULL){
+        
+        if(!is.null(percent_this)){
+          hyou_oa_now <- hyou_oa_now |> mutate(across(all_of(percent_this), ~{round(100*., digits = 1)}))
+          hyou_oa_past <- hyou_oa_past |> mutate(across(all_of(percent_this), ~{round(100*., digits = 1)}))
+          hyou_now <- hyou_now |> mutate(across(all_of(percent_this), ~{round(100*., digits = 1)}))
+          hyou_past <- hyou_past |> mutate(across(all_of(percent_this), ~{round(100*., digits = 1)}))
+        }
+        
         
         hyou <- bind_rows(
           hyou_oa_now  |>  select(all_of(c("時期", "対象", select_these))),
@@ -234,23 +245,26 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
           hyou_past    |>  filter(`対象`==target_grp_name) |> select(all_of(c("時期", "対象", select_these)))
         )
         
-        hyou_order <- c("対象", flatten_chr(map(select_these, ~{ c(str_c(.,"_今回"), str_c(.,"_前回")) })))
+        hyou_order <- c("対象", list_c(map(select_these, ~{ c(str_c(.,"_今回"), str_c(.,"_前回")) })))
         
         col_group_list <- list(
-          colGroup(name = "全体"         , columns = c(str_c("全体"         , c("_今回","_前回")))),
-          colGroup(name = target_grp_name, columns = c(str_c(target_grp_name, c("_今回","_前回"))))
+          colGroup(name = "全体"         , columns = c(str_c("全体"         , c("_今回","_前回"))), align = "left"),
+          colGroup(name = target_grp_name, columns = c(str_c(target_grp_name, c("_今回","_前回"))), align = "left")
         )
         
-        if( !is.null(percent_this) ){
-          hyou <- hyou |> 
-            mutate(across(all_of(percent_this), ~.*100))
-        }
+        col_list <- list()
+        col_list[["全体_今回"]] <- colDef(name = "今回", align="left")
+        col_list[["全体_前回"]] <- colDef(name = "前回", align="left")
+        col_list[[str_c(target_grp_name,"_今回")]] <- colDef(name = "今回", align="left")
+        col_list[[str_c(target_grp_name,"_前回")]] <- colDef(name = "前回", align="left")
+        col_list[["name"]] <- colDef(name = "項目", align="left" )
+        
         
         hyou2 <- hyou |> 
           pivot_longer(cols = !c(`対象`,`時期`)) |> 
-          pivot_wider(id_cols = `name`, names_from = c(`対象`,`時期`), values_from = value)
+          pivot_wider(id_cols = `name`, names_from = c(`対象`,`時期`), values_from = value) 
         
-        reactable(hyou2, columnGroups = col_group_list, columns = )
+        hh <- reactable(hyou2, columnGroups = col_group_list, columns = col_list)
         
         oa_value <- hyou_oa_now$`高ストレス者割合`
         
@@ -264,11 +278,108 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
         
         ghres <- tribble(
           ~bunrui, ~name, ~value, ~h, ~g,
-          "基本", "基本", "basic", hyou, gg
+          "基本", "基本", "basic", hh, gg
         )
         
       }
       
+      ghres <- tibble()
+      for(i in 1:length(ghsetting)){
+        asetting <- enframe(ghsetting)$value[[i]]
+        set_type <- asetting$type
+        
+        if(set_type == "gh"){
+          set_select_these <- asetting$select_these
+          set_plot_this <- asetting$plot_this
+          set_percent_this <- asetting$percent_this
+          
+          ares <- make_gh_result(hyou_oa_now, hyou_now, target_grp_name, set_select_these, set_plot_this, set_percent_this)   
+        }else if(set_type == "hanteizu"){
+          
+          tgtgyousyu <- input$gyousyu
+          set_select_these <- asetting$select_these
+          
+          ares <- make_hanteizu_result()
+          name_mapper <- c("仕事の負担" = "demand", "仕事のコントロール" = "control")  #ggplot のx軸、y軸にこの順番でラベルとして入る
+          make_hanteizu_result <- function(hyou_oa_now, hyou_now, set_select_these,target_grp_name,risk_calc_setting, tgtsyokusyu,name_mapper){
+            gdat_now <- bind_rows(
+              hyou_oa_now |> select(grp, all_of(set_select_these)) |> mutate(type = "会社平均"),
+              hyou_now    |> select(grp, all_of(set_select_these)) |> 
+                mutate(type = case_when(
+                  grp == target_grp_name ~ target_grp_name,
+                  TRUE ~ "他"
+                ))
+            )
+            
+            gdat_past <- bind_rows(
+              hyou_oa_past |> select(grp, all_of(set_select_these)) |> mutate(type = "会社平均"),
+              hyou_past    |> select(grp, all_of(set_select_these)) |> 
+                mutate(type = case_when(
+                  grp == target_grp_name ~ target_grp_name,
+                  TRUE ~ "他"
+                ))
+            )
+            
+            benchdata_long <- risk_calc_setting |> 
+              filter(type=="long",gyousyu == tgtsyokusyu, coefname %in% c(set_select_these)) |> 
+              select(grp = gyousyu, coefname, avg)
+            
+            benchdata <- benchdata_long |> 
+              pivot_wider(id_cols = grp, names_from = coefname, values_from = avg) |> 
+              mutate(type = str_c(tgtsyokusyu,"(ベンチマーク)"))
+            
+            gdat_fin <- gdat_now |> bind_rows(benchdata)  
+            
+            gg <- ggplot(gdat_fin) +
+              geom_point(aes(x = demand, y = control, color = type, shape=type), size=2) +
+              labs(color = NULL, shape=NULL, x = names(name_mapper[1]), y = names(name_mapper[2])) +
+              theme_bw(base_size=14)
+            
+            col_order <- c("name",str_c("全体",c("_今回","_前回")),str_c(target_grp_name,c("_今回","_前回")))
+            
+            hdat <- bind_rows(
+              gdat_now  |> filter(grp %in% c("全体",target_grp_name)) |> mutate(`時期` = "今回") |> select(`時期`,`grp`,all_of(set_select_these)),
+              gdat_past |> filter(grp %in% c("全体",target_grp_name)) |> mutate(`時期` = "前回") |> select(`時期`,`grp`,all_of(set_select_these))
+            ) |>
+              mutate(across(all_of(set_select_these), ~{round(.,digits=2)})) |> 
+              rename(name_mapper) |> 
+              pivot_longer(cols = !c("時期","grp")) |> 
+              pivot_wider(id_cols = name, values_from = value, names_from = c(grp,`時期`)) |> 
+              relocate(all_of(col_order))
+            
+            benchdata_hyou <- benchdata_long |> 
+              mutate(coefname = case_when(
+                coefname == as.character(name_mapper[1]) ~ names(name_mapper[1]),
+                coefname == as.character(name_mapper[2]) ~ names(name_mapper[2])
+              )) |> 
+              select(!!rlang::sym(str_c(tgtsyokusyu,"(ベンチマーク)")) := avg, name = coefname)
+            
+            hdat <- hdat |> 
+              left_join(benchdata_hyou,by="name")
+            
+            col_group_list <- list(
+              colGroup(name = "全体"         , columns = c(str_c("全体"         , c("_今回","_前回"))), align = "left"),
+              colGroup(name = target_grp_name, columns = c(str_c(target_grp_name, c("_今回","_前回"))), align = "left")
+            )
+            
+            col_list <- list()
+            col_list[["全体_今回"]] <- colDef(name = "今回", align="left")
+            col_list[["全体_前回"]] <- colDef(name = "前回", align="left")
+            col_list[[str_c(target_grp_name,"_今回")]] <- colDef(name = "今回", align="left")
+            col_list[[str_c(target_grp_name,"_前回")]] <- colDef(name = "前回", align="left")
+            col_list[["name"]] <- colDef(name = "項目", align="left" )
+            
+            
+            hh <- reactable(hdat, columns = col_list, columnGroups = col_group_list)  
+            
+            
+          }
+          
+        }
+        
+        
+        ghres <- bind_rows(ghres, ares)
+      }
       
       return(ghres)
     })
