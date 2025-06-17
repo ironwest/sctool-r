@@ -223,7 +223,8 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
       #基本‐基本
       select_these <- c("受検人数","不完全回答人数","高ストレス者人数","高ストレス者割合")
       percent_this <- c("高ストレス者割合")
-      target_grp_name <- "マーケット戦略部"
+      plot_this <- c("高ストレス者割合")
+      
       
       make_gh_result <- function(hyou_oa_now, hyou_now, target_grp_name, select_these, plot_this, percent_this = NULL){
         
@@ -237,40 +238,54 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
         hyou_order <- c("対象", flatten_chr(map(select_these, ~{ c(str_c(.,"_今回"), str_c(.,"_前回")) })))
         
         col_group_list <- list(
-          colGroup(name = "全体"         , columns = c(str_c("全体"         , c("_今回","_前回")))),
-          colGroup(name = target_grp_name, columns = c(str_c(target_grp_name, c("_今回","_前回"))))
+          colGroup(name = "全体"         ,align = "left", columns = c(str_c("全体"         , c("_今回","_前回")))),
+          colGroup(name = target_grp_name,align = "left", columns = c(str_c(target_grp_name, c("_今回","_前回"))))
         )
+        
+        col_order <- c(str_c("全体", c("_今回","_前回")),str_c(target_grp_name, c("_今回","_前回")))
+        
+        col_setting_list <- map(set_names(col_order), ~{
+          val <- str_extract(., "今回|前回")
+          colDef(name = val, align = "left")
+        })
+          
+          
         
         if( !is.null(percent_this) ){
           hyou <- hyou |> 
-            mutate(across(all_of(percent_this), ~.*100))
+            mutate(across(all_of(percent_this), ~round(.*100,1)))
         }
         
         hyou2 <- hyou |> 
           pivot_longer(cols = !c(`対象`,`時期`)) |> 
           pivot_wider(id_cols = `name`, names_from = c(`対象`,`時期`), values_from = value)
         
-        reactable(hyou2, columnGroups = col_group_list, columns = )
+        rhyou <-reactable(
+          hyou2, 
+          columnGroups = col_group_list, 
+          columns = col_setting_list
+        )
         
-        oa_value <- hyou_oa_now$`高ストレス者割合`
-        
+        oa_value <- hyou_oa_now[[plot_this]]
+        browser()
         gg <- ggplot(hyou_now) +
           geom_vline(xintercept = oa_value, color = "grey50", linetype="dashed") +
           geom_col(aes(y = reorder(`対象`,`高ストレス者割合`), x = `高ストレス者割合`, fill=color_this), width=0.5) +
-          scale_x_continuous(labels = scales::percent) +
           labs(title = "高ストレス者(%)", y = NULL) +
           theme_bw(base_size = 16) +
           theme(legend.position = "none")
         
         ghres <- tribble(
           ~bunrui, ~name, ~value, ~h, ~g,
-          "基本", "基本", "basic", hyou, gg
+          "基本", "基本", "basic", rhyou, gg
         )
         
+        return(ghres)
       }
       
       
-      return(ghres)
+      gh_result <- make_gh_result(hyou_oa_now, hyou_now, target_grp_name, select_these, plot_this, percent_this = percent_this)
+      return(gh_result)
     })
     
     #--- 基本テーブルのレンダリング------------------------
@@ -290,8 +305,8 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
       req(analysis_results())
       
       hh <- analysis_results() |> filter(value == input$analysis_target) |> pull(h)
-      hh <- reactable(hh[[1]])
-      return(hh)
+      
+      return(hh[[1]])
     })
     
     # --- ★ PDFダウンロード (ggplot対応版) ---
