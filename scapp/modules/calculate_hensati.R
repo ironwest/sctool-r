@@ -8,6 +8,7 @@ library(tidyverse)
 # nbjsqlabs <- read_csv("nbjsq_label_hensati.csv")
 
 
+#' @params ret either "hensati" or "precise"
 
 calculate_hensati <- function(d, hensati_data, tgtsheet, grp_vars, nbjsq, nbjsqlabs, ret = "hensati"){
 
@@ -54,9 +55,10 @@ calculate_hensati <- function(d, hensati_data, tgtsheet, grp_vars, nbjsq, nbjsql
       left_join(hensati_filt,by=c( "syakudo_hensati" = "syakudo_name"))  |> 
       mutate(hensatigrp = "全体", .before=1)
   }
-    
+  
   d2 <- d2 |> 
     mutate(hensati = 50 + 10*(value -mean_val)/sd_val)
   
   return(d2)
 }
+

@@ -14,20 +14,22 @@ source("calculate_hensati.R")
 source("calculate_sougoukrisk.R")
 source("calculate_hensati_hyou.R")
 source("setting_hensati_hyou.R")
-source("setting_gh_analysis.R")
+source("setting_gh_analysis.R") #ghsetting
 source("setting_bench_mapper.R")
+source("make_xx_result.R")
 
-hensati_data <- read_csv("table11.csv")
-nbjsq <- read_csv("nbjsq_question_text.csv")
-nbjsqlabs <- read_csv("nbjsq_label_hensati.csv")
+hensati_data      <- read_csv("table11.csv")
+nbjsq             <- read_csv("nbjsq_question_text.csv")
+nbjsq_answerlabs  <- read_csv("nbjsq_answer_labels.csv")
+nbjsqlabs         <- read_csv("nbjsq_label_hensati.csv")
 risk_calc_setting <- read_csv("../modules/risk_coefficients.csv")
 
 
 #hensati_dataをマッピングできるように名前を変更をする
 hensati_data <- hensati_data |> 
   filter(qtype == "NBJSQ") |> 
-  mutate(`尺度名` = factor(`尺度名`, levels = names(benchmapper), labels = benchmapper)) |> 
-  mutate(`尺度名` = as.character(`尺度名`))
+  mutate(`尺度名bench` = factor(`尺度名`, levels = names(benchmapper), labels = benchmapper)) |> 
+  mutate(`尺度名bench` = as.character(`尺度名bench`))
 
 skrisk_gyousyu <- c(
   "全産業",
@@ -65,10 +67,18 @@ nbjsq_gyousyu <- c(
 
 analysis_target_choices <- list(
   "基本" = list("基本" = "basic"),
-  "BJSQ" = list("高ストレス者" = "hs","総合健康リスク" = "skrisk","ストレス判定図:負担" = "hantei_hutan","ストレス判定図:支援" = "hantei_sien"),
-  "アウトカム" = list("ワークエンゲイジメント" = "we", "職場の一体感" = "sc", "ハラスメント" = "harass", "心理的ストレス反応" = "stress_reaction", "仕事の負担" = "work_hutan"),
-  "資源" = list("作業レベル" = "sigen_sagyou","部署レベル" = "sigen_busyo","事業場レベル" = "sigen_jigyouba"),
-  "その他" = list("その他" = "else")
+  "BJSQ" = list("総合健康リスク" = "skrisk",
+                "ストレス判定図:負担" = "hantei_hutan",
+                "ストレス判定図:支援" = "hantei_sien"),
+  "アウトカム" = list("ワークエンゲイジメント" = "outcome_we", 
+                 "職場の一体感" = "outcome_sc", 
+                 "ハラスメント" = "outcome_harass", 
+                 "心理的ストレス反応" = "outcome_stress_reaction", 
+                 "仕事の負担" = "outcome_work_hutan"),
+  "資源" = list("作業レベル" = "sigen_sagyou",
+              "部署レベル" = "sigen_busyo",
+              "事業場レベル" = "sigen_jigyouba"),
+  "その他" = list("その他" = "na_else")
 )
 
 analysis_target_tibble <- enframe(analysis_target_choices) |> 
@@ -103,6 +113,8 @@ dept_comparison_module_ui <- function(id) {
                  h4("ベンチマーク職種の設定"),
                  selectInput(ns("bench_gyousyu"), "NBJSQのベンチマーク用の業種の選択",
                              choices = nbjsq_gyousyu),
+                 h4("表示形式の設定"),
+                 selectInput(ns("analysis_displaytype"),"偏差値/平均値の切り替え", choices = c("偏差値" = "hensati", "平均値" = "average")),
                  actionButton(ns("run_comparison"), "比較を実行", icon = icon("search-plus"), class = "btn-success", style="margin-top: 25px;"))
         ),
       )
@@ -110,7 +122,11 @@ dept_comparison_module_ui <- function(id) {
     fluidRow(
       box(
         title = "分析結果", width = 12, status = "info", solidHeader = TRUE,
-        selectInput(ns("analysis_target"),"分析結果の選択", choices = analysis_target_choices),
+        fluidRow(
+          column(width=6,
+                 selectInput(ns("analysis_target"),"分析結果の選択", choices = analysis_target_choices)       
+                 )
+        ),
         fluidRow(
           column(width = 6,
                  h4("グラフ"),
@@ -176,7 +192,7 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
         target_grp_name <- str_c(input$target_dept1,"-",input$target_dept2)
       }
       
-      #データの加工
+      #データの加工-----------------------------------------
       hyou_now <- calculate_hensati_hyou(
         current_data = data_now, 
         hensati_data = hensati_data, 
@@ -227,11 +243,6 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
           precise=TRUE
         )
       
-      hyou_oa_now  <<- hyou_oa_now
-      hyou_oa_past <<- hyou_oa_past
-      hyou_now     <<- hyou_now
-      hyou_past    <<- hyou_past
-      
       hyou_oa_now  <- hyou_oa_now  |> 
         mutate(`時期` = "今回") |> 
         mutate(`対象` = grp) |> 
@@ -255,270 +266,30 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
         mutate(color_this = grp == target_grp_name)
       
       
-
-      
-      
-      make_ghbase_result <- function(hyou_oa_now, hyou_now, target_grp_name, asetting){
-        
-        select_these <- asetting$select_these
-        plot_this <- asetting$plot_this
-        percent_this <- asetting$percent_this
-        set_bunrui <- asetting$bunrui
-        set_name <- asetting$name
-        
-        if(!is.null(percent_this)){
-          hyou_oa_now <- hyou_oa_now |> mutate(across(all_of(percent_this), ~{round(100*., digits = 1)}))
-          hyou_oa_past <- hyou_oa_past |> mutate(across(all_of(percent_this), ~{round(100*., digits = 1)}))
-          hyou_now <- hyou_now |> mutate(across(all_of(percent_this), ~{round(100*., digits = 1)}))
-          hyou_past <- hyou_past |> mutate(across(all_of(percent_this), ~{round(100*., digits = 1)}))
-        }
-        
-        
-        hyou <- bind_rows(
-          hyou_oa_now  |>  select(all_of(c("時期", "対象", select_these))),
-          hyou_oa_past |>  select(all_of(c("時期", "対象", select_these))),
-          hyou_now     |>  filter(`対象`==target_grp_name) |> select(all_of(c("時期", "対象", select_these))),
-          hyou_past    |>  filter(`対象`==target_grp_name) |> select(all_of(c("時期", "対象", select_these)))
-        )
-        
-        hyou_order <- c("対象", list_c(map(select_these, ~{ c(str_c(.,"_今回"), str_c(.,"_前回")) })))
-        
-        col_group_list <- list(
-          colGroup(name = "全体"         ,align = "left", columns = c(str_c("全体"         , c("_今回","_前回")))),
-          colGroup(name = target_grp_name,align = "left", columns = c(str_c(target_grp_name, c("_今回","_前回")))),
-          colGroup(name = "全体"         , columns = c(str_c("全体"         , c("_今回","_前回"))), align = "left"),
-          colGroup(name = target_grp_name, columns = c(str_c(target_grp_name, c("_今回","_前回"))), align = "left")
-        )
-        
-        col_order <- c(str_c("全体", c("_今回","_前回")),str_c(target_grp_name, c("_今回","_前回")))
-        
-        col_setting_list <- map(set_names(col_order), ~{
-          val <- str_extract(., "今回|前回")
-          colDef(name = val, align = "left")
-        })
-
-        col_list <- list()
-        col_list[["全体_今回"]] <- colDef(name = "今回", align="left")
-        col_list[["全体_前回"]] <- colDef(name = "前回", align="left")
-        col_list[[str_c(target_grp_name,"_今回")]] <- colDef(name = "今回", align="left")
-        col_list[[str_c(target_grp_name,"_前回")]] <- colDef(name = "前回", align="left")
-        col_list[["name"]] <- colDef(name = "項目", align="left" )
-        
-        
-        hyou2 <- hyou |> 
-          pivot_longer(cols = !c(`対象`,`時期`)) |> 
-          pivot_wider(id_cols = `name`, names_from = c(`対象`,`時期`), values_from = value) 
-        
-        rhyou <-reactable(
-          hyou2, 
-          columnGroups = col_group_list, 
-          columns = col_setting_list
-        )
-        hh <- reactable(hyou2, columnGroups = col_group_list, columns = col_list)
-        
-        oa_value <- hyou_oa_now[[plot_this]]
-        
-        gg <- ggplot(hyou_now) +
-          geom_vline(xintercept = oa_value, color = "grey50", linetype="dashed") +
-          geom_col(aes(y = reorder(`対象`,`高ストレス者割合`), x = `高ストレス者割合`, fill=color_this), width=0.5) +
-          labs(title = "高ストレス者(%)", y = NULL) +
-          theme_bw(base_size = 16) +
-          theme(legend.position = "none")
-        
-        ghres <- tribble(
-          ~bunrui   , ~name   , ~h   , ~g,
-          set_bunrui, set_name, rhyou, gg
-        )
-        
-        return(ghres)
-      }
-      
-      make_hanteizu_result <- function(hyou_oa_now, hyou_now, asetting ,target_grp_name,risk_calc_setting, tgtsyokusyu){
-        
-        set_bunrui <- asetting$bunrui
-        set_name <- asetting$name
-        set_select_these <- asetting$select_these
-        name_mapper <- asetting$name_mapper
-        
-        gdat_now <- bind_rows(
-          hyou_oa_now |> select(grp, all_of(set_select_these)) |> mutate(type = "会社平均"),
-          hyou_now    |> select(grp, all_of(set_select_these)) |> 
-            mutate(type = case_when(
-              grp == target_grp_name ~ target_grp_name,
-              TRUE ~ "他"
-            ))
-        )
-        
-        gdat_past <- bind_rows(
-          hyou_oa_past |> select(grp, all_of(set_select_these)) |> mutate(type = "会社平均"),
-          hyou_past    |> select(grp, all_of(set_select_these)) |> 
-            mutate(type = case_when(
-              grp == target_grp_name ~ target_grp_name,
-              TRUE ~ "他"
-            ))
-        )
-        
-        benchdata_long <- risk_calc_setting |> 
-          filter(type=="long",gyousyu == tgtsyokusyu, coefname %in% c(set_select_these)) |> 
-          select(grp = gyousyu, coefname, avg)
-        
-        benchdata <- benchdata_long |> 
-          pivot_wider(id_cols = grp, names_from = coefname, values_from = avg) |> 
-          mutate(type = str_c(tgtsyokusyu,"(ベンチマーク)"))
-        
-        gdat_fin <- gdat_now |> bind_rows(benchdata)  
-        
-        gg <- ggplot(gdat_fin) +
-          geom_point(aes(x = demand, y = control, color = type, shape=type), size=2) +
-          labs(color = NULL, shape=NULL, x = names(name_mapper[1]), y = names(name_mapper[2])) +
-          theme_bw(base_size=14)
-        
-        col_order <- c("name",str_c("全体",c("_今回","_前回")),str_c(target_grp_name,c("_今回","_前回")))
-        
-        hdat <- bind_rows(
-          gdat_now  |> filter(grp %in% c("全体",target_grp_name)) |> mutate(`時期` = "今回") |> select(`時期`,`grp`,all_of(set_select_these)),
-          gdat_past |> filter(grp %in% c("全体",target_grp_name)) |> mutate(`時期` = "前回") |> select(`時期`,`grp`,all_of(set_select_these))
-        ) |>
-          mutate(across(all_of(set_select_these), ~{round(.,digits=2)})) |> 
-          rename(name_mapper) |> 
-          pivot_longer(cols = !c("時期","grp")) |> 
-          pivot_wider(id_cols = name, values_from = value, names_from = c(grp,`時期`)) |> 
-          relocate(all_of(col_order))
-        
-        benchdata_hyou <- benchdata_long |> 
-          mutate(coefname = case_when(
-            coefname == as.character(name_mapper[1]) ~ names(name_mapper[1]),
-            coefname == as.character(name_mapper[2]) ~ names(name_mapper[2])
-          )) |> 
-          select(!!rlang::sym(str_c(tgtsyokusyu,"(ベンチマーク)")) := avg, name = coefname)
-        
-        hdat <- hdat |> 
-          left_join(benchdata_hyou,by="name")
-        
-        col_group_list <- list(
-          colGroup(name = "全体"         , columns = c(str_c("全体"         , c("_今回","_前回"))), align = "left"),
-          colGroup(name = target_grp_name, columns = c(str_c(target_grp_name, c("_今回","_前回"))), align = "left")
-        )
-        
-        col_list <- list()
-        col_list[["全体_今回"]] <- colDef(name = "今回", align="left")
-        col_list[["全体_前回"]] <- colDef(name = "前回", align="left")
-        col_list[[str_c(target_grp_name,"_今回")]] <- colDef(name = "今回", align="left")
-        col_list[[str_c(target_grp_name,"_前回")]] <- colDef(name = "前回", align="left")
-        col_list[["name"]] <- colDef(name = "項目", align="left" )
-        
-        
-        hh <- reactable(hdat, columns = col_list, columnGroups = col_group_list)  
-        
-        ghres <- tribble(
-          ~bunrui, ~name, ~h, ~g,
-          set_bunrui,set_name, hh, gg
-        )
-        
-        return(ghres)
-        
-      }
-      make_gh_result <- function(hyou_oa_now, hyou_now, hensati_data, tgtnbjsq_gyousyu, target_grp_name, asetting){
-        browser()
-        
-        
-        
-        select_these <- asetting$select_these
-        plot_this <- asetting$plot_this
-        percent_this <- asetting$percent_this
-        set_bunrui <- asetting$bunrui
-        set_name <- asetting$name
-        
-        hensati_data |> filter(qtype == "NBJSQ") |>  count(`尺度名`) |> print(n = 72)
-        
-        #ベンチマークの設定#------------------------------#-----ここから---------------------------------
-        select_these
-        bench_data <- hensati_data |> 
-          filter(qtype == "NBJSQ") |> 
-          filter(sheet == tgtnbjsq_gyousyu) 
-        
-        if(!is.null(percent_this)){
-          hyou_oa_now <- hyou_oa_now |> mutate(across(all_of(percent_this), ~{round(100*., digits = 1)}))
-          hyou_oa_past <- hyou_oa_past |> mutate(across(all_of(percent_this), ~{round(100*., digits = 1)}))
-          hyou_now <- hyou_now |> mutate(across(all_of(percent_this), ~{round(100*., digits = 1)}))
-          hyou_past <- hyou_past |> mutate(across(all_of(percent_this), ~{round(100*., digits = 1)}))
-        }
-        
-        
-        hyou <- bind_rows(
-          hyou_oa_now  |>  select(all_of(c("時期", "対象", select_these))),
-          hyou_oa_past |>  select(all_of(c("時期", "対象", select_these))),
-          hyou_now     |>  filter(`対象`==target_grp_name) |> select(all_of(c("時期", "対象", select_these))),
-          hyou_past    |>  filter(`対象`==target_grp_name) |> select(all_of(c("時期", "対象", select_these)))
-        )
-        
-        hyou_order <- c("対象", list_c(map(select_these, ~{ c(str_c(.,"_今回"), str_c(.,"_前回")) })))
-        
-        col_group_list <- list(
-          colGroup(name = "全体"         ,align = "left", columns = c(str_c("全体"         , c("_今回","_前回")))),
-          colGroup(name = target_grp_name,align = "left", columns = c(str_c(target_grp_name, c("_今回","_前回")))),
-          colGroup(name = "全体"         , columns = c(str_c("全体"         , c("_今回","_前回"))), align = "left"),
-          colGroup(name = target_grp_name, columns = c(str_c(target_grp_name, c("_今回","_前回"))), align = "left")
-        )
-        
-        col_order <- c(str_c("全体", c("_今回","_前回")),str_c(target_grp_name, c("_今回","_前回")))
-        
-        col_setting_list <- map(set_names(col_order), ~{
-          val <- str_extract(., "今回|前回")
-          colDef(name = val, align = "left")
-        })
-        
-        col_list <- list()
-        col_list[["全体_今回"]] <- colDef(name = "今回", align="left")
-        col_list[["全体_前回"]] <- colDef(name = "前回", align="left")
-        col_list[[str_c(target_grp_name,"_今回")]] <- colDef(name = "今回", align="left")
-        col_list[[str_c(target_grp_name,"_前回")]] <- colDef(name = "前回", align="left")
-        col_list[["name"]] <- colDef(name = "項目", align="left" )
-        
-        
-        hyou2 <- hyou |> 
-          pivot_longer(cols = !c(`対象`,`時期`)) |> 
-          pivot_wider(id_cols = `name`, names_from = c(`対象`,`時期`), values_from = value) 
-        
-        rhyou <-reactable(
-          hyou2, 
-          columnGroups = col_group_list, 
-          columns = col_setting_list
-        )
-        hh <- reactable(hyou2, columnGroups = col_group_list, columns = col_list)
-        
-        oa_value <- hyou_oa_now[[plot_this]]
-        
-        gg <- ggplot(hyou_now) +
-          geom_vline(xintercept = oa_value, color = "grey50", linetype="dashed") +
-          geom_col(aes(y = reorder(`対象`,`高ストレス者割合`), x = `高ストレス者割合`, fill=color_this), width=0.5) +
-          labs(title = "高ストレス者(%)", y = NULL) +
-          theme_bw(base_size = 16) +
-          theme(legend.position = "none")
-        
-        ghres <- tribble(
-          ~bunrui   , ~name   , ~h   , ~g,
-          set_bunrui, set_name, rhyou, gg
-        )
-        
-        return(ghres)
-      }
-      
+      #グラフとテーブルを設定データをもとに作成する------------------------------------
       ghres <- tibble()
       for(i in 1:length(ghsetting)){
+
         asetting <- enframe(ghsetting)$value[[i]]
         set_type <- asetting$type
         
         if(set_type == "ghbase"){
-          ares <- make_ghbase_result(hyou_oa_now, hyou_now, target_grp_name, asetting)   
+          ares <- make_ghbase_result(hyou_oa_now, hyou_now,hyou_oa_past, hyou_past, target_grp_name, asetting)   
         }else if(set_type == "hanteizu"){
           tgtsyokusyu <- input$gyousyu
-          ares <- make_hanteizu_result(hyou_oa_now, hyou_now, asetting, target_grp_name,risk_calc_setting, tgtsyokusyu)
+          ares <- make_hanteizu_result(hyou_oa_now, hyou_now,hyou_oa_past, hyou_past, asetting, target_grp_name,risk_calc_setting, tgtsyokusyu)
         }else if(set_type == "gh"){
           tgtgyousyu <- input$bench_gyousyu
-          ares <- make_gh_result(hyou_oa_now, hyou_now, hensati_data, tgtgyousyu, target_grp_name, asetting)
+          ares <- make_gh_result(hyou_oa_now, hyou_now,hyou_oa_past, hyou_past, hensati_data, tgtgyousyu, target_grp_name, asetting, mode="gh", display_type = input$analysis_displaytype)
+          qqres <- make_qq_result(data_now, data_past, target_grp_name, asetting)
+          
+          ares <- ares |> left_join(qqres, by=c("bunrui","name"))
+        }else if(set_type == "h"){
+          ares <- make_gh_result(hyou_oa_now, hyou_now,hyou_oa_past, hyou_past, hensati_data, tgtgyousyu, target_grp_name, asetting, mode="h", display_type = input$analysis_displaytype)
+          qqres <- make_qq_result(data_now, data_past, target_grp_name, asetting)
+          
+          ares <- ares |> left_join(qqres, by=c("bunrui","name"))
         }
-        
         
         ghres <- bind_rows(ghres, ares)
       }
@@ -528,22 +299,30 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
     })
     
     #--- 基本テーブルのレンダリング------------------------
-    
-    # --- ★ 棒グラフのレンダリング (renderPlotly -> renderPlot) ---
     output$graph <- renderPlot({
       req(analysis_results())
+      req(input$analysis_target)
       
-      gg <- analysis_results() |> filter(value == input$analysis_target) |> pull(g)
+      aset <- ghsetting[[input$analysis_target]]
       
-      return(gg)
+      gg <- analysis_results() |> 
+        filter(bunrui == aset$bunrui, name == aset$name) |> 
+        pull(g)
+      
+      return(gg[[1]])
       
     })
     
     # 詳細テーブルのレンダリング (データをワイド形式に再変形)
     output$hyou <- renderReactable({
       req(analysis_results())
+      req(input$analysis_target)
       
-      hh <- analysis_results() |> filter(value == input$analysis_target) |> pull(h)
+      aset <- ghsetting[[input$analysis_target]]
+      
+      hh <- analysis_results() |> 
+        filter(bunrui == aset$bunrui, name == aset$name) |> 
+        pull(h)
       
       return(hh[[1]])
     })

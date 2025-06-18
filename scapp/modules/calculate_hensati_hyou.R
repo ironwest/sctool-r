@@ -11,14 +11,22 @@ calculate_hensati_hyou <- function(current_data, hensati_data, target_sheet, gro
     tgtsheet=target_sheet, 
     grp_vars = group_vars, 
     nbjsq = nbjsq, 
-    nbjsqlabs=nbjsqlabs, 
-    ret = "hensati"
+    nbjsqlabs=nbjsqlabs
   )
   
-  hyou <- hyou |>  #<<- を最後に<-に戻すこと（デバッグ中）
-    select(hensatigrp, all_of(group_vars), syakudo_japanese, hensati) |> 
-    pivot_wider(id_cols = all_of(group_vars), names_from = syakudo_japanese, values_from = hensati)
-  
+  if(precise){ #make mean and hensati column if precise is true
+    hyou <- hyou |> 
+      select(hensatigrp, all_of(group_vars), syakudo_japanese, hensati, average = value) |> 
+      pivot_wider(id_cols = all_of(group_vars), names_from = syakudo_japanese, values_from = c(hensati, average))
+      
+    newcolnames <- str_remove(colnames(hyou), "hensati_" )
+    hyou <- hyou |> setNames(newcolnames)
+    
+  }else{
+    hyou <- hyou |> 
+      select(hensatigrp, all_of(group_vars), syakudo_japanese, hensati) |> 
+      pivot_wider(id_cols = all_of(group_vars), names_from = syakudo_japanese, values_from = hensati)
+  }
   
   #高ストレス者の人数と割合を計算する
   hyouhs <- current_data |> 
