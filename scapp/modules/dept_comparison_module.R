@@ -128,18 +128,26 @@ dept_comparison_module_ui <- function(id) {
                  )
         ),
         fluidRow(
-          column(width = 6,
+          column(width = 4,
                  h4("グラフ"),
                  plotOutput(ns("graph")) |> withSpinner()
           ),
-          column(width = 6,
-                 h4("詳細"),
+          column(width = 8,
+                 h4("尺度別の前回・今回の比較"),
                  reactableOutput(ns("hyou")) |> withSpinner()
           )
         ),
+        fluidRow(
+          column(width = 12,style = "margin-top:10px;",
+                 h4("設問の回答状況"),
+                 reactableOutput(ns("hyouq1")) |> withSpinner(),
+                 reactableOutput(ns("hyouq2")) |> withSpinner(),
+                 reactableOutput(ns("hyouq3")) |> withSpinner()
+          )
+        ),
         hr(),
-        p("以下のボタンから、分析結果をまとめてPDFレポートとしてダウンロードできます。"),
-        downloadButton(ns("download_report_button"), "PDFレポートをダウンロード", icon = icon("file-pdf"))
+        p("以下のボタンから、分析結果をまとめたExcelのレポートとしてダウンロードできます。"),
+        downloadButton(ns("download_report_button"), "Excelレポートをダウンロード", icon = icon("file-pdf"))
       )
     )
   )
@@ -281,19 +289,18 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
         }else if(set_type == "gh"){
           tgtgyousyu <- input$bench_gyousyu
           ares <- make_gh_result(hyou_oa_now, hyou_now,hyou_oa_past, hyou_past, hensati_data, tgtgyousyu, target_grp_name, asetting, mode="gh", display_type = input$analysis_displaytype)
-          qqres <- make_qq_result(data_now, data_past, target_grp_name, asetting)
+          qqres <- make_qq_result(data_now, data_past, target_grp_name, asetting, nbjsq, nbjsq_answerlabs)
           
           ares <- ares |> left_join(qqres, by=c("bunrui","name"))
         }else if(set_type == "h"){
           ares <- make_gh_result(hyou_oa_now, hyou_now,hyou_oa_past, hyou_past, hensati_data, tgtgyousyu, target_grp_name, asetting, mode="h", display_type = input$analysis_displaytype)
-          qqres <- make_qq_result(data_now, data_past, target_grp_name, asetting)
+          qqres <- make_qq_result(data_now, data_past, target_grp_name, asetting, nbjsq, nbjsq_answerlabs)
           
           ares <- ares |> left_join(qqres, by=c("bunrui","name"))
         }
         
         ghres <- bind_rows(ghres, ares)
       }
-      
       
       return(ghres)
     })
@@ -302,7 +309,6 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
     output$graph <- renderPlot({
       req(analysis_results())
       req(input$analysis_target)
-      
       aset <- ghsetting[[input$analysis_target]]
       
       gg <- analysis_results() |> 
@@ -313,7 +319,7 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
       
     })
     
-    # 詳細テーブルのレンダリング (データをワイド形式に再変形)
+    # 詳細テーブルのレンダリング
     output$hyou <- renderReactable({
       req(analysis_results())
       req(input$analysis_target)
@@ -324,42 +330,125 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
         filter(bunrui == aset$bunrui, name == aset$name) |> 
         pull(h)
       
-      return(hh[[1]])
+      hh[[1]]
+    })
+  
+    question_hyous <- reactive({
+      req(analysis_results())
+      req(input$analysis_target)
+      
+      aset <- ghsetting[[input$analysis_target]]
+      if("questions" %in% names(aset)){
+        q <- analysis_results() |> 
+          filter(bunrui == aset$bunrui, name == aset$name) |> 
+          pull(q)
+        
+        q <- q[[1]]
+      }else{
+        q <- NULL
+      }
+      
+      return(q)
+    })  
+  
+    output$hyouq1 <- renderReactable({
+      req(question_hyous())
+      qhyous <- question_hyous()
+      
+      if(is.null(qhyous)){
+        qres <- reactable(tibble(" " = ""))
+      }else{
+        if(nrow(qhyous)>=1){
+          qres <- qhyous |> slice(1) |> pull(qhyou)
+          qres <- qres[[1]]
+        }else{
+          qres <- reactable(tibble(" " = ""))
+        }
+      }
+      return(qres)
     })
     
-    # --- ★ PDFダウンロード (ggplot対応版) ---
+    output$hyouq2 <- renderReactable({
+      req(question_hyous())
+      qhyous <- question_hyous()
+      if(is.null(qhyous)){
+        qres <- reactable(tibble(" " = ""))
+      }else{
+        if(nrow(qhyous)>=2){
+          qres <- qhyous |> slice(2) |> pull(qhyou)
+          qres <- qres[[1]]
+        }else{
+          qres <- reactable(tibble(" " = ""))
+        }
+      }
+      return(qres)
+    })
+    
+    output$hyouq3 <- renderReactable({
+      req(question_hyous())
+      
+      qhyous <- question_hyous()
+      if(is.null(qhyous)){
+        qres <- reactable(tibble(" " = ""))
+      }else{
+        if(nrow(qhyous)>=3){
+          print(str_c("NROW QHYOU: ",nrow(qhyous)))
+          qres <- qhyous |> slice(3) |> pull(qhyou)
+          qres <- qres[[1]]
+        }else{
+          qres <- reactable(tibble(" " = ""))
+        }
+      }
+      return(qres)
+    })
+    
+    
+    
+    # --- ★ PDFダウンロード  ---
     output$download_report_button <- downloadHandler(
       filename = function() {
         paste0("department_report_", input$target_dept, "_", Sys.Date(), ".pdf")
       },
       content = function(file) {
         req(analysis_results())
+
+        if(TRUE){ #デバッグ用
+          browser()
+          
+          ardat <- analysis_results()
+          ardat <<- ardat
+          # パラメータを準備
+          report_params <<- list(
+            dept1 = input$target_dept1,
+            dept2 = input$target_dept2,
+            skr_gyousyu = input$gyousyu,
+            skr_longcross = input$long_or_cross,
+            bench_gyousyu = input$bench_gyousyu,
+            display_type = input$analysis_displaytype,
+            rendering_data = ardat
+          )
+          
+          write_rds(ardat, "temp.rds", compress="gz")
+          write_rds(report_params,"repparam.rds", compress="gz")
+        }
         
-        # 1. ggplot オブジェクトを生成
-        plot_data_long <- analysis_results()
-        comparison_plot <- ggplot(plot_data_long, aes(x = 平均値, y = reorder(尺度, 平均値), fill = group)) +
-          geom_col(position = "dodge") +
-          geom_vline(xintercept = 50, linetype = "dashed", color = "gray50") +
-          labs(
-            title = paste(isolate(input$target_dept), "の分析結果"),
-            x = "平均スコア (T得点)", y = NULL, fill = "比較グループ"
-          ) +
-          theme_minimal(base_size = 12) + # PDF用に少しフォントサイズを調整
-          theme(legend.position = "bottom")
-        
-        # 2. R Markdownに渡すパラメータを準備
+        #openxlsx2でエクセルファイルを作成する
+        # パラメータを準備
         report_params <- list(
-          selected_dept = input$target_dept,
-          comparison_group_name = isolate(input$comparison_group),
-          main_plot = comparison_plot, # ★ ggplotオブジェクトを直接渡す
-          table_data = analysis_results() # テーブル用データ
+          dept1 = input$target_dept1,
+          dept2 = input$target_dept2,
+          skr_gyousyu = input$gyousyu,
+          skr_longcross = input$long_or_cross,
+          bench_gyousyu = input$bench_gyousyu,
+          display_type = input$analysis_displaytype,
+          rendering_data = analysis_results()
         )
         
-        # (Rmdファイルのコピーとrenderの呼び出しは変更なし)
+        # Rmdファイルのコピーとrenderの呼び出し
         temp_report_path <- file.path(tempdir(), "report_template.Rmd")
         file.copy("report_template.Rmd", temp_report_path, overwrite = TRUE)
         
-        showNotification("PDFレポートを生成中です...", duration = 5, type = "message")
+        showNotification("エクセルレポートを生成中です...", duration = 5, type = "message")
         
         rmarkdown::render(
           input = temp_report_path,
@@ -402,64 +491,6 @@ server <- function(input, output, session) {
   )
 }
 
-# --- 6. R Markdown テンプレート ("report_template.Rmd") の内容 (変更あり) ---
-# ★ グラフ描画部分を、渡されたggplotオブジェクトをprintするだけに変更
-# --- report_template.Rmd の内容 ここから ---
-# ```yaml
-# ---
-# title: "部署別 健康度・ストレス状況レポート"
-# author: "ストレスチェック分析ツール"
-# date: "`r format(Sys.time(), '%Y年%m月%d日')`"
-# output: 
-#   pdf_document:
-#     latex_engine: xelatex
-#     mainfont: "Yu Gothic" # Windowsの場合。Macなら "HiraginoSans-W3" など
-# params:
-#   selected_dept: "部署名"
-#   comparison_group_name: "組織全体"
-#   main_plot: NULL
-#   table_data: NULL
-# ---
-# 
-# ```{r setup, include=FALSE}
-# library(knitr)
-# library(dplyr)
-# library(tidyr)
-# library(ggplot2)
-# knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
-# ```
-# 
-# ## 分析サマリー
-# 
-# **分析対象部署:** `r params$selected_dept`
-# 
-# **比較基準:** `r params$comparison_group_name`
-# 
-# ### 1. 棒グラフによる全体像
-# 
-# 以下のグラフは、選択された部署と`r params$comparison_group_name`の各尺度の平均値を比較したものです。
-# 
-# ```{r main-plot, fig.height=5, fig.width=7, fig.align='center'}
-# # ★ ggplotオブジェクトを直接プリントするだけ
-# if (!is.null(params$main_plot)) {
-#   print(params$main_plot)
-# }
-# ```
-# 
-# ### 2. 詳細データ
-# 
-# ```{r detail-table}
-# if (!is.null(params$table_data)) {
-#   table_for_pdf <- params$table_data |>
-#     pivot_wider(names_from = group, values_from = 平均値) |>
-#     mutate(across(where(is.numeric), ~round(.x, 2)))
-#   
-#   knitr::kable(table_for_pdf, caption = "尺度別平均値")
-# }
-# ```
-# --- report_template.Rmd の内容 ここまで ---
-
 
 # --- 6. アプリケーションの実行 ---
-# 注意: 実行する前に、上記の内容で "report_template.Rmd" ファイルを作成してください。
 shinyApp(ui, server)

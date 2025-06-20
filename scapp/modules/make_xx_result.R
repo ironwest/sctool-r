@@ -65,6 +65,9 @@ make_ghbase_result <- function(hyou_oa_now,
   
   hh <- reactable(hyou2, columnGroups = col_group_list, columns = col_list)
   
+  hexcel <- tibble::lst(
+    hyou2, col_group_list, col_list
+  )
   
   gdat <- hyou_now |> 
     select(busyo = `対象`, color_this, plotthis = all_of(plot_this)) |>
@@ -85,11 +88,19 @@ make_ghbase_result <- function(hyou_oa_now,
     guides(fill="none")  
   
   
+  hexcel <- tibble::lst(
+    hyou2, col_group_list, col_list
+  )
+  
+  gexcel <- list(
+    avg_company = avg_company,
+    gdat = gdat
+  )
   
   
   ghres <- tribble(
-    ~bunrui   , ~name   , ~h   , ~g,~q,
-    set_bunrui, set_name, hh   , gg, NULL
+    ~bunrui   , ~name   , ~h   , ~g,   ~q, ~hexcel, ~gexcel, ~qexcel, ~asetting,
+    set_bunrui, set_name, hh   , gg, NULL,  hexcel,  gexcel, NULL   ,  asetting
   )
   
   return(ghres)
@@ -180,9 +191,19 @@ make_hanteizu_result <- function(hyou_oa_now,
   
   hh <- reactable(hdat, columns = col_list, columnGroups = col_group_list)  
   
+  
+  hexcel <- tibble::lst(
+    hdat, col_group_list, col_list
+  )
+  
+  gexcel <- list(
+    gdat = gdat_fin
+  )
+  
+  
   ghres <- tribble(
-    ~bunrui, ~name, ~h, ~g, ~q,
-    set_bunrui,set_name, hh, gg, NULL
+    ~bunrui   , ~name   , ~h   , ~g,   ~q, ~hexcel, ~gexcel, ~qexcel, ~asetting,
+    set_bunrui, set_name, hh   , gg, NULL,  hexcel,  gexcel, NULL   ,  asetting
   )
   
   return(ghres)
@@ -303,50 +324,164 @@ make_gh_result <- function(hyou_oa_now,
       theme(legend.position = "bottom") +
       guides(fill="none")  
     
-    ghres <- tribble(
-      ~bunrui   , ~name   , ~h   , ~g, 
-      set_bunrui, set_name, hh   , gg
-    )
+    
     
   }else if(mode == "h"){
     
-    ghres <- tribble(
-      ~bunrui   , ~name   , ~h   , ~g  ,
-      set_bunrui, set_name, hh   , NULL
-    )
-    
+    gg <- NULL
+    gdat <- NULL
+    avg_company <- NULL
+    avg_bench <- NULL
   }
+  
+  hexcel <- tibble::lst(
+    hyou2, col_group_list, col_list
+  )
+  
+  gexcel <- list(
+    avg_company = avg_company,
+    avg_bench = avg_bench,
+    gdat = gdat
+  )
+  
+  
+  ghres <- tribble(
+    ~bunrui   , ~name   , ~h   , ~g, ~hexcel, ~gexcel,  ~asetting,
+    set_bunrui, set_name, hh   , gg,  hexcel,  gexcel,  asetting
+  )
   
   return(ghres)
 }
 
-make_qq_result <- function(data_now, data_past, target_grp_name, asetting, nbjsq, nbjsq_answerlabs){
-  browser()
-  data_now <<- data_now
-  data_past <<- data_past
-  target_grp_name <<- target_grp_name
+make_qq_result <- function(data_now, 
+                           data_past, 
+                           target_grp_name, 
+                           asetting, nbjsq, 
+                           nbjsq_answerlabs){
+
+  data_now <- data_now
+  data_past <- data_past
+  target_grp_name <- target_grp_name
   
-  set_bunrui <<- asetting$bunrui
-  set_name <<- asetting$name
-  set_questions <<- asetting$questions
-  
-  nbjsq
-  nbjsq_answerlabs
-  
-  colnames(data_now)
-  data_now |> 
+  set_bunrui <- asetting$bunrui
+  set_name <- asetting$name
+  set_questions <- asetting$questions
+
+  #回答状況をfilter
+  ansdata <- data_now |> 
     filter(grp == target_grp_name) |> 
-    select( q79, q80) |> 
+    select( all_of(str_c("q",set_questions)) ) |> 
     pivot_longer(cols = everything()) |> 
-    count(name, value) |> 
-    pivot_wider(id_cols = name, names_from = value, values_from = n)
+    count(name, value) |>
+    pivot_wider(id_cols = name, names_from = value, values_from = n) |> 
+    mutate(qnum = str_extract(name,"\\d+") |> as.numeric())
   
+  #設問内容をfilter
+  textdata <- nbjsq |> 
+    filter(qnum %in% set_questions) |> 
+    select(syakudo_minor,  qnum, qtext) |> 
+    mutate(qnum = as.numeric(qnum))
   
+  #回答内容をfilter
+  labeldata <- nbjsq_answerlabs |> 
+    filter(q %in% set_questions) |> 
+    rename(qnum = q) |> 
+    mutate(qnum = as.numeric(qnum))
   
+  hdat <- textdata |> 
+    left_join(ansdata, by="qnum") |> 
+    left_join(labeldata, by="qnum")
   
+  hdat <<- hdat
+  
+  bar_style <- function(width = 1, fill = "#e6e6e6", height = "65%",
+                        align = c("left", "right"), color = NULL) {
+    align <- match.arg(align)
+    if (align == "left") {
+      position <- paste0(width * 100, "%")
+      image <- sprintf("linear-gradient(90deg, %1$s %2$s, transparent %2$s)", fill, position)
+    } else {
+      position <- paste0(100 - width * 100, "%")
+      image <- sprintf("linear-gradient(90deg, transparent %1$s, %2$s %1$s)", position, fill)
+    }
+    list(
+      backgroundImage = image,
+      backgroundSize = paste("100%", height),
+      backgroundRepeat = "no-repeat",
+      backgroundPosition = "center",
+      color = color
+    )
+  }
+  
+  hdat <- hdat |> 
+    group_nest(label1,label2,label3,label4) |> 
+    mutate(qtemp  = pmap(list(label1,label2,label3,label4,data), ~{
+      
+      adat <- ..5
+      
+      adat <- adat |> 
+        mutate(good_percent = if_else(good_value == 1, (`1`+`2`)/(`1`+`2`+`3`+`4`), (`3`+`4`)/(`1`+`2`+`3`+`4`)))
+    
+      
+      GOOD_COLOR <- "lightcyan"  # 良いイメージの色
+      BAD_COLOR <- "mistyrose"   # 悪いイメージの色
+      
+      col_list <- list(
+        syakudo_minor = colDef(name = "尺度", width=250, vAlign = "center", align = "left"),
+        qnum          = colDef(name = "Q", width=40, vAlign = "center", align = "left"),
+        qtext         = colDef(name = "設問", width=600, vAlign = "center", align="left"),
+        name          = colDef(show = FALSE),
+        `1`           = colDef(name = ..1, width=70, vAlign = "center", align="center",
+                               style = function(value, index) {
+                                 good_value_row <- adat$good_value[index]
+                                 if (good_value_row == 1) {
+                                   list(backgroundColor = GOOD_COLOR) # good_valueが1なら「良い」色
+                                 } else if (good_value_row == 4) {
+                                   list(backgroundColor = BAD_COLOR) # good_valueが4なら「悪い」色
+                                 } else {
+                                   list(backgroundColor = NEUTRAL_COLOR) # その他ならデフォルト色
+                                 }
+                               }),
+        `2`           = colDef(name = ..2, width=70, vAlign = "center",align="center"),
+        `3`           = colDef(name = ..3, width=70, vAlign = "center",align="center"),
+        `4`           = colDef(name = ..4, width=70, vAlign = "center",align="center",
+                               style = function(value, index) {
+                                 good_value_row <- adat$good_value[index] # その行のgood_valueを取得
+                                 if (good_value_row == 1) {
+                                   list(backgroundColor = BAD_COLOR) # good_valueが1なら「悪い」色
+                                 } else if (good_value_row == 4) {
+                                   list(backgroundColor = GOOD_COLOR) # good_valueが4なら「良い」色
+                                 } else {
+                                   list(backgroundColor = NEUTRAL_COLOR) # その他ならデフォルト色
+                                 }
+                               }),
+        good_value    = colDef(show=FALSE),
+        good_percent  = colDef(name = "良好な回答の割合", format = colFormat(digits=1, percent=TRUE), vAlign = "center",align="center",
+                               style = function(value) {
+                                 bar_style(width = value / 1, fill = "#3CB371", color = "#000")
+                               },
+                                width = 300)
+        
+      )
+      
+      return(
+        list(
+          reactable_table = reactable(adat,columns = col_list,bordered = TRUE),
+          qexcel = list(adat, col_list)  
+        )
+      )
+
+    })) |> 
+    mutate(qhyou  = map(qtemp, ~.[["reactable_table"]])) |> 
+    mutate(qexcel = map(qtemp, ~.[["qexcel"]]))
+  
+  qq     <- hdat |> select(qhyou)
+  qexcel <- hdat |> select(qexcel)
   
   ghres <- tribble(
-    ~bunrui   , ~name   , ~q,
-    set_bunrui, set_name, qq
+    ~bunrui   , ~name   , ~q,  ~qexcel,
+    set_bunrui, set_name, qq,  qexcel
   )
+  
+  return(ghres)
 }
