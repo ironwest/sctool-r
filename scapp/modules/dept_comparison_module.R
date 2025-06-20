@@ -428,7 +428,6 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
             rendering_data = ardat
           )
           
-          write_rds(ardat, "temp.rds", compress="gz")
           write_rds(report_params,"repparam.rds", compress="gz")
         }
         

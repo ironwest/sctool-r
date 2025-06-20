@@ -467,7 +467,7 @@ make_qq_result <- function(data_now,
       return(
         list(
           reactable_table = reactable(adat,columns = col_list,bordered = TRUE),
-          qexcel = list(adat, col_list)  
+          qexcel = list(adat = adat, col_list = col_list, labels = c(..1,..2,..3,..4))  
         )
       )
 
