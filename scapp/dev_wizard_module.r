@@ -10,6 +10,7 @@ library(tidyr)
 
 source("modules/wizard_module.R")
 
+
 # --- アプリケーション実行のためのUIとサーバー ---
 ui <- dashboardPage(
   dashboardHeader(title = "ウィザードテストアプリ"),
@@ -33,6 +34,7 @@ ui <- dashboardPage(
     )
   )
 )
+
 
 server <- function(input, output, session) {
   # 今年度ウィザードモジュールのサーバーロジック呼び出し

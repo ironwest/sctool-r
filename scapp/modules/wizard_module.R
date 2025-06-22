@@ -7,7 +7,7 @@ wizard_module_ui <- function(id) {
   #値マッピング用で利用する質問番号の順番に質問の文章が含まれるベクトル
   qtext <- read_csv("modules/nbjsq_question_text.csv") |> dplyr::pull(qtext)
   
-  # 値マッピングのタブUI(可読性アップのため)-----------------
+  # 値マッピングのタブUI-----------------
   overall_value_mapping_tabpanel <- 
     tabPanel(
       title = "一括設定", 
@@ -105,7 +105,8 @@ wizard_module_ui <- function(id) {
       div(
         id = ns("step1_ui"),
         h3("ステップ1: CSVファイルのアップロード"),
-        p("ストレスチェック結果（CSV形式）をアップロードしてください。"),
+        p("ストレスチェック結果（CSV形式）を本ツールで読み込める形式に変換する必要があります。変換する対象となるCSVファイルをアップロードしてください。"),
+        p("すでに、処理済みのCSVファイルがある場合は、下のステップ1'のメニューからファイルを読み込ませてください。"),
         fileInput(ns("csv_file_input"), "CSVファイルを選択",
                   multiple = FALSE,
                   accept = c("text/csv", "text/comma-separated-values,text/plain", ".csv"), 
@@ -114,7 +115,16 @@ wizard_module_ui <- function(id) {
         textOutput(ns("csv_upload_status_text")),
         dataTableOutput(ns("csv_preview_table")),
         br(),
-        actionButton(ns("goto_step2_button"), "次へ：列名マッピング", class = "btn-primary", icon = icon("arrow-right"))
+        actionButton(ns("goto_step2_button"), "次へ：列名マッピング", class = "btn-primary", icon = icon("arrow-right")),
+        div(style = "border-bottom: 2px dotted #000; margin-top: 15px; margin-bottom: 15px;"),
+        h3("ステップ1': 処理済みファイルのアップロード"),
+        p("すでにマッピング済みのCSVファイルを読みこむ場合はこちらからファイルを読み込ませてください。"),
+        fileInput(ns("processed_file_input"),"処理済みCSVファイルを選択",
+                  multiple=FALSE,
+                  accept = c("text/csv", "text/comma-separated-values,text/plain", ".csv"), 
+                  buttonLabel = "ファイルを選択...",
+                  placeholder = "ファイルが選択されていません"),
+        actionButton(ns("read_processed_csv_button"),"マッピング済みCSVを読み込む", class="btn-primary", icon=icon("upload"))
       )
     ),
     
@@ -136,7 +146,7 @@ wizard_module_ui <- function(id) {
                  downloadButton(ns("col_map_config_save_button"), "現在の列マッピング設定を保存")
           )
         ),
-        hr(),
+        div(style = "height: 5px; background-color: #f39c12; border-radius: 2px; margin-top: 15px; margin-bottom: 15px;"),
         h4("社員番号,年齢、性別、所属の列設定"),
         wellPanel(
           fluidRow(
