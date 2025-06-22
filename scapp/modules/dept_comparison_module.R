@@ -88,7 +88,7 @@ analysis_target_tibble <- enframe(analysis_target_choices) |>
   })) |> 
   select(bunrui,dfr) |> 
   unnest(dfr)
-
+# TODO: 集団解析で、10人未満部署を一つにまとめる方法
 dept_comparison_module_ui <- function(id) {
   ns <- NS(id)
   tagList(
