@@ -420,7 +420,7 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
           rendering_data = analysis_results()
         )
         
-        
+        #TODO: Add info panel for rendering report
         make_excel_report(report_params, file)
         
       }
