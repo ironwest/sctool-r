@@ -98,8 +98,11 @@ dept_comparison_module_ui <- function(id) {
           )
         ),
         hr(),
-        p("以下のボタンから、分析結果をまとめたExcelのレポートとしてダウンロードできます。"),
-        downloadButton(ns("download_report_button"), "Excelレポートをダウンロード", icon = icon("file-pdf"))
+        p("以下のボタンから、分析結果をまとめたExcelのレポートとしてダウンロードできます。（20－30秒レポート作成にかかります）"),
+        downloadButton(ns("download_report_button"), "Excelレポートをダウンロード", icon = icon("file-excel")),
+        hr(),
+        p("以下のボタンで、全部署のレポートを作成します実行時間が長くなる場合があるため、注意してください。"),
+        downloadButton(ns("download_all_report_button"), "全部署のExcelレポートをダウンロード", icon = icon("folder"))
       )
     )
   )
@@ -125,6 +128,8 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
     
     
     # --- UIの動的更新 ---
+    
+    
     observe({
       req(processed_data_now())
       data <- processed_data_now()
@@ -148,22 +153,17 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
     })
     
     # --- 分析実行 (変更なし) ---
-    analysis_results <- eventReactive(input$run_comparison, {
-      req(processed_data_now(), input$target_dept1)
+    gen_analysis_results <- function(data_now, data_past,level, targetdept1, targetdept2, gyousyu, long_or_cross,bench_gyousyu,analysis_displaytype){
       
-      #dept1かdept2かでロジックを分けるのは手間なので、grpという変数を作成する
-      level <- input$level_select
-      data_now <- processed_data_now()  
-      data_past <- processed_data_past()  
       
       if(level == "dept1"){
         data_now <- data_now |> mutate(grp = dept1)
         data_past <- data_past |> mutate(grp = dept1)
-        target_grp_name <- input$target_dept1
+        target_grp_name <- targetdept1
       }else if(level == "dept1_dept2"){
         data_now <- data_now |> mutate(grp = str_c(dept1,"-",dept2))
         data_past <- data_past |> mutate(grp = str_c(dept1,"-",dept2))
-        target_grp_name <- str_c(input$target_dept1,"-",input$target_dept2)
+        target_grp_name <- str_c(targetdept1,"-",targetdept2)
       }
       
       #データの加工-----------------------------------------
@@ -174,8 +174,8 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
         group_vars = "grp", 
         nbjsq = nbjsq, 
         nbjsqlabs = nbjsqlabs,
-        target_gyousyu = input$gyousyu,
-        target_longorcross = input$long_or_cross,
+        target_gyousyu = gyousyu,
+        target_longorcross = long_or_cross,
         precise=TRUE
       )
       
@@ -187,8 +187,8 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
           group_vars = "grp", 
           nbjsq = nbjsq, 
           nbjsqlabs = nbjsqlabs,
-          target_gyousyu = input$gyousyu,
-          target_longorcross = input$long_or_cross,
+          target_gyousyu = gyousyu,
+          target_longorcross = long_or_cross,
           precise=TRUE
         )
       
@@ -199,8 +199,8 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
         group_vars = "grp", 
         nbjsq = nbjsq, 
         nbjsqlabs = nbjsqlabs,
-        target_gyousyu = input$gyousyu,
-        target_longorcross = input$long_or_cross,
+        target_gyousyu = gyousyu,
+        target_longorcross = long_or_cross,
         precise=TRUE
       )
       
@@ -212,8 +212,8 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
           group_vars = "grp", 
           nbjsq = nbjsq, 
           nbjsqlabs = nbjsqlabs,
-          target_gyousyu = input$gyousyu,
-          target_longorcross = input$long_or_cross,
+          target_gyousyu = gyousyu,
+          target_longorcross = long_or_cross,
           precise=TRUE
         )
       
@@ -250,16 +250,16 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
         if(set_type == "ghbase"){
           ares <- make_ghbase_result(hyou_oa_now, hyou_now,hyou_oa_past, hyou_past, target_grp_name, asetting)   
         }else if(set_type == "hanteizu"){
-          tgtsyokusyu <- input$gyousyu
+          tgtsyokusyu <- gyousyu
           ares <- make_hanteizu_result(hyou_oa_now, hyou_now,hyou_oa_past, hyou_past, asetting, target_grp_name,risk_calc_setting, tgtsyokusyu)
         }else if(set_type == "gh"){
-          tgtgyousyu <- input$bench_gyousyu
-          ares <- make_gh_result(hyou_oa_now, hyou_now,hyou_oa_past, hyou_past, hensati_data, tgtgyousyu, target_grp_name, asetting, mode="gh", display_type = input$analysis_displaytype)
+          tgtgyousyu <- bench_gyousyu
+          ares <- make_gh_result(hyou_oa_now, hyou_now,hyou_oa_past, hyou_past, hensati_data, tgtgyousyu, target_grp_name, asetting, mode="gh", display_type = analysis_displaytype)
           qqres <- make_qq_result(data_now, data_past, target_grp_name, asetting, nbjsq, nbjsq_answerlabs)
           
           ares <- ares |> left_join(qqres, by=c("bunrui","name"))
         }else if(set_type == "h"){
-          ares <- make_gh_result(hyou_oa_now, hyou_now,hyou_oa_past, hyou_past, hensati_data, tgtgyousyu, target_grp_name, asetting, mode="h", display_type = input$analysis_displaytype)
+          ares <- make_gh_result(hyou_oa_now, hyou_now,hyou_oa_past, hyou_past, hensati_data, tgtgyousyu, target_grp_name, asetting, mode="h", display_type = analysis_displaytype)
           qqres <- make_qq_result(data_now, data_past, target_grp_name, asetting, nbjsq, nbjsq_answerlabs)
           
           ares <- ares |> left_join(qqres, by=c("bunrui","name"))
@@ -269,6 +269,24 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
       }
       
       return(ghres)
+    }
+    
+    analysis_results <- eventReactive(input$run_comparison, {
+      req(processed_data_now(), input$target_dept1)
+      
+      res <- gen_analysis_results(data_now = processed_data_now(),
+                           data_past = processed_data_past(),
+                           level = input$level_select,
+                           targetdept1 = input$target_dept1,
+                           targetdept2 = input$target_dept2,
+                           gyousyu = input$gyousyu,
+                           long_or_cross = input$long_or_cross,
+                           bench_gyousyu = input$bench_gyousyu,
+                           analysis_displaytype = input$analysis_displaytype)
+      
+      
+      
+      return(res)
     })
     
     #--- 基本テーブルのレンダリング------------------------
@@ -371,7 +389,7 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
     
     
     
-    # --- ★ PDFダウンロード  ---
+    # レポートダウンロードハンドラー-----------------------
     output$download_report_button <- downloadHandler(
       filename = function() {
         if(input$level_select=="dept1"){
@@ -408,6 +426,11 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
           write_rds(report_params,"repparam.rds", compress="gz")
         }
         
+        #プログレスバーを表示する
+        progress <- shiny::Progress$new()
+        progress$set(message = "Excelレポートを作成中", value = 0)
+        on.exit(progress$close())
+        
         #openxlsx2でエクセルファイルを作成する
         # パラメータを準備
         report_params <- list(
@@ -421,10 +444,117 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
         )
         
         #TODO: Add info panel for rendering report
-        make_excel_report(report_params, file)
+        make_excel_report(report_params, file, progress)
         
       }
     )
     
+    output$download_all_report_button <- downloadHandler(
+      filename = function(){
+        if(input$level_select=="dept1"){
+          filename <- "大分類.zip"
+        }else if(input$level_select == "dept1_dept2"){
+          filename <- "大分類-中分類.zip"
+        }
+        
+        return(filename)
+      },
+      content = function(file){
+        temp_report_dir <- file.path(tempdir(), paste0("reports_", as.integer(Sys.time())))
+        dir.create(temp_report_dir)
+
+        progress1 <- shiny::Progress$new()
+        progress1$set(message = "全部署レポートを作成中", value = 0)
+        on.exit(progress1$close())
+        
+        #選択されているものを固定する(念のため
+        gyousyu <- input$gyousyu
+        long_or_cross <- input$long_or_cross
+        bench_gyousyu <- input$bench_gyousyu
+        analysis_displaytype <- input$analysis_displaytype
+        
+        #choiceを再度取得
+        data <- processed_data_now()
+        level <- input$level_select
+      
+        dept1_choice <- unique(data$dept1) |> sort()
+        dept2_choice <- data |> 
+          filter(dept1 == input$target_dept1) |> 
+          pull(dept2) |> 
+          unique() |> 
+          sort()
+        
+        if(level == "dept1_dept2"){
+          #10人以上だけ出力する
+          choices <- data |> count(dept1, dept2) |> filter(n >= 10)
+        }else if(level == "dept1"){
+          choices <- data |> count(dept1) |> filter(n >= 10)
+        }
+        
+        totchoices <- nrow(choices)
+        for(i in 1:totchoices){
+          
+          progress1$set(message = str_c(i,"/",totchoices,"のレポートを作成中"), value = i*(1/totchoices))
+          adept1 <- choices$dept1[i]
+          
+          if(level == "dept1_dept2"){
+            adept2 <- choices$dept2[i]  
+          }else{
+            adept2 <- NULL
+          }
+          
+          progress2 <- shiny::Progress$new()
+          progress2$set(message = "Excelレポートを作成中", value = 0)
+          
+          res <- gen_analysis_results(data_now = processed_data_now(),
+                                      data_past = processed_data_past(),
+                                      level = level,
+                                      targetdept1 = adept1,
+                                      targetdept2 = adept2,
+                                      gyousyu = gyousyu,
+                                      long_or_cross = long_or_cross,
+                                      bench_gyousyu = bench_gyousyu,
+                                      analysis_displaytype = analysis_displaytype)
+          
+          report_params <- list(
+            dept1 = adept1,
+            dept2 = adept2,
+            skr_gyousyu = gyousyu,
+            skr_longcross = long_or_cross,
+            bench_gyousyu = bench_gyousyu,
+            display_type = analysis_displaytype,
+            rendering_data = res
+          )
+          
+          filename_xlsx <- str_c(adept1,"_",adept2,".xlsx")
+          invalid_pattern <- "[<>:\"/\\\\|?*]|[\\x00-\\x1F]"
+          output_path <- file.path(temp_report_dir, str_remove_all(filename_xlsx, invalid_pattern))
+          
+          
+          #TODO: Add info panel for rendering report
+          make_excel_report(report_params, output_path, progress2)
+          
+          progress2$close()
+        }
+     
+        
+        # 元の作業ディレクトリを記憶
+        owd <- getwd()
+        # 関数を抜け出すときに必ず元のディレクトリに戻るように設定
+        on.exit(setwd(owd), add = TRUE) # add = TRUEで既存のon.exit(progress$close())を上書きしない
+        
+        # 専用の一時フォルダに作業ディレクトリを移動
+        setwd(temp_report_dir)
+        
+        # フォルダ内にあるすべてのファイルを取得
+        files_to_zip <- list.files(full.name=TRUE)
+        
+        # zipコマンドを実行
+        # zipfileにはShinyから渡された絶対パス`file`を指定
+        # filesにはカレントディレクトリのファイルリストを指定
+        zip::zipr(zipfile = file, files = files_to_zip)
+      }
+    )
   })
 }
+

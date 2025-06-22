@@ -9,6 +9,7 @@ library(reactable)
 library(shinycssloaders)
 library(ggplot2)  
 library(openxlsx2)
+library(zip)
 
 source("modules/dept_comparison_module.R")
 

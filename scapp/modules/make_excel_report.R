@@ -20,7 +20,7 @@ make_region <- function(data, initdim){
   return(str_c(initdim,":",int2col(endcol),endrow))
 }
 
-make_excel_report <- function(report_params, filepath){
+make_excel_report <- function(report_params, filepath, progress){
 
   GOOD_COLOR <- "lightcyan" 
   BAD_COLOR <- "mistyrose"
@@ -29,7 +29,7 @@ make_excel_report <- function(report_params, filepath){
   wb$set_base_font(font_name="BIZ UDP ゴシック")
 
   #タイトルページの作成------------------
-  
+  progress$inc(amount = 0.1, detail = "タイトルページを作成中")
   ## シートの作成
   sht1 <- "表紙"
   wb$add_worksheet(sheet=sht1)
@@ -51,6 +51,7 @@ make_excel_report <- function(report_params, filepath){
   wb$add_data(sht1,report_params$skr_gyousyu,"B8")
   
   #全体集計:尺度----------------------------
+  progress$inc(amount = 0.1, detail = "部署の尺度全体集計を作成中")
   shtoa1 <- "部署の結果(尺度)"
   wb$add_worksheet(sheet=shtoa1)
   wb$add_data(shtoa1,"部署の結果(尺度)", dims="A1")
@@ -113,6 +114,7 @@ make_excel_report <- function(report_params, filepath){
   
   
   #全体集計:設問---------------------------
+  progress$inc(amount = 0.1, detail = "部署の尺度個別質問を作成中")
   shtoa2 <- "部署の結果(設問)"
   wb$add_worksheet(sheet=shtoa2)
   wb$add_data(shtoa2,"部署の結果(設問)", dims="A1")
@@ -177,9 +179,11 @@ make_excel_report <- function(report_params, filepath){
   
   
   #以下、グラフとプロットのレンダリング START LOOP-----------------------
-
+  progress$inc(amount = 0.1, detail = "個別尺度のページを作成中")
   showtext_auto()
-  for(apagenum in 1:nrow(report_params$rendering_data)){
+  
+  total_repeat <- nrow(report_params$rendering_data)
+  for(apagenum in 1:total_repeat){
     print(apagenum)
     
     #1ページずつここから作成----------------
@@ -188,6 +192,10 @@ make_excel_report <- function(report_params, filepath){
     asetting <- aghq$asetting[[1]]
     abunrui <- aghq$bunrui
     aname <- aghq$name
+    
+    
+    progress$inc(amount = 0.6/total_repeat, detail = str_c(abunrui,":",aname))
+    
     hexcel <- aghq$hexcel[[1]]
     gexcel <- aghq$gexcel[[1]]
     qexcel <- aghq$qexcel[[1]]
