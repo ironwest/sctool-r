@@ -16,14 +16,14 @@
 # )
 
 
-# d <- read_csv("../demodata/processed_nbjsq_dummy_data1_alpha.csv")
+# d <- read_csv("demodata/processed_nbjsq_dummy_data1_alpha.csv")
 # grp_vars <- c("dept1","dept2")
 # tgtgyousyu <- "全産業"
 
 #総合健康リスクを計算する関数
 calculate_sougoukrisk <- function(d, grp_vars, tgtgyousyu,precise=FALSE){
   #設定の読み込み
-  risk_calc_setting <- read_csv("../modules/risk_coefficients.csv")
+  risk_calc_setting <- read_csv("modules/risk_coefficients.csv")
   
   #指定した業種の係数と、平均値を取得する
   risk_calc_setting <- risk_calc_setting |> 

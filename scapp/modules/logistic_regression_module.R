@@ -1,14 +1,4 @@
-# --- 1. 必要ライブラリ ---
-library(shiny)
-library(shinydashboard)
-library(dplyr)
-library(tidyr)
-library(reactable)
-library(shinycssloaders)
-library(broom)
-library(ggplot2) # ヒストグラム描画のために追加
-
-# --- 2. ロジスティック回帰分析モジュールUI ---
+# ロジスティック回帰分析モジュールUI --------
 analysis_regression_module_ui <- function(id) {
   ns <- NS(id)
   tagList(
@@ -51,7 +41,7 @@ analysis_regression_module_ui <- function(id) {
   )
 }
 
-# --- 3. ロジスティック回帰分析モジュールサーバー ---
+# ロジスティック回帰分析モジュールサーバー ---
 analysis_regression_module_server <- function(id,
                                               processed_current_year_data,
                                               processed_previous_year_data) {
@@ -63,8 +53,6 @@ analysis_regression_module_server <- function(id,
       processed_previous_year_data() |> 
         mutate(across(matches("^q"), as.factor))
     })
-    
-      
     
     # UIの選択肢を動的に更新
     observe({
@@ -81,7 +69,7 @@ analysis_regression_module_server <- function(id,
       updateSelectizeInput(session, "predictor_vars", choices = choices_past)
     })
     
-    # --- ★★★ アウトカムプレビューの動的生成 ★★★ -------
+    # アウトカムプレビューの動的生成-------
     output$outcome_preview_ui <- renderUI({
       req(processed_current_year_data(), input$outcome_var)
       
@@ -156,11 +144,9 @@ analysis_regression_module_server <- function(id,
         count(カテゴリー, name = "件数", sort = TRUE) |>
         reactable(compact = TRUE, bordered = TRUE, highlight = TRUE)
     })
-    # --- ★★★ プレビュー機能ここまで ★★★ ------------
     
-    # 分析結果を保持するリアクティブな値
+    # 分析結果を保持するリアクティブな値------
     analysis_results <- eventReactive(input$run_regression_button, {
-      # ... (既存の分析ロジック) ...
       req(
         processed_current_year_data(),
         processed_previous_year_data(),
@@ -182,7 +168,7 @@ analysis_regression_module_server <- function(id,
         outcome_data <- outcome_data |>
           mutate(outcome_binary = if_else(outcome_col >= input$outcome_threshold, 1, 0))
       } else {
-        # カテゴリー変数の場合: 最初のカテゴリーを1、それ以外を0とする（要件に応じて変更）
+        # カテゴリー変数の場合: 最初のカテゴリーを1、それ以外を0とする
         first_category <- unique(na.omit(outcome_data$outcome_col))[1]
         showNotification(paste0("カテゴリー変数 '", first_category, "' を1、その他を0として分析します。"), type="warning")
         outcome_data <- outcome_data |>
@@ -190,7 +176,6 @@ analysis_regression_module_server <- function(id,
       }
       outcome_data <- outcome_data |> select(empid, outcome_binary)
       
-      # ... (説明変数、統制変数の選択と結合) ...
       all_predictors <- input$predictor_vars
       predictor_data <- data_past |>
         select(empid, all_of(all_predictors))
@@ -242,33 +227,3 @@ analysis_regression_module_server <- function(id,
     
   })
 }
-
-
-# --- 4. スタンドアロンアプリ ---
-# (ダミーデータ作成、アプリUI、アプリサーバーは変更なし)
-dummy_current_data <- read_csv("../demodata/processed_nbjsq_dummy_data1_alpha.csv")
-dummy_previous_data <- read_csv("../demodata/processed_nbjsq_dummy_data2_alpha.csv")
-
-
-
-ui <- dashboardPage(
-  dashboardHeader(title = "回帰分析モジュール テスト"),
-  dashboardSidebar(),
-  dashboardBody(
-    analysis_regression_module_ui("regression_module")
-  )
-)
-
-server <- function(input, output, session) {
-  current_data_reactive <- reactive({ dummy_current_data })
-  previous_data_reactive <- reactive({ dummy_previous_data })
-  
-  analysis_regression_module_server(
-    id = "regression_module",
-    processed_current_year_data = current_data_reactive,
-    processed_previous_year_data = previous_data_reactive
-  )
-}
-
-# --- 5. アプリケーションの実行 ---
-shinyApp(ui, server)

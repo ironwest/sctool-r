@@ -1,37 +1,20 @@
-# --- 1. 必要ライブラリ ---
-# reactable を追加
-library(shiny)
-library(shinydashboard)
-library(dplyr)
-library(reactable) 
-library(shinycssloaders)
-
-source("calculate_hensati.R")
-source("calculate_sougoukrisk.R")
-source("calculate_hensati_hyou.R")
-source("setting_hensati_hyou.R")
-
-hensati_data <- read_csv("table11.csv")
-nbjsq <- read_csv("nbjsq_question_text.csv")
-nbjsqlabs <- read_csv("nbjsq_label_hensati.csv")
-skrisk_gyousyu <- c(
-  "全産業",
-  "医療・福祉",
-  "運輸・郵便業",
-  "卸売・小売業",
-  "教育・学習支援業",
-  "金融・保険業",
-  "建設業",
-  "公務",
-  "サービス業",
-  "情報通信業",
-  "製造業"
-)
-
-
-# --- 2. 表描画モジュールUI (`analysis_table_module_ui`) ---
+# 表描画モジュールUI----------------------
 analysis_table_module_ui <- function(id) {
   ns <- NS(id) # 名前空間を取得
+  
+  skrisk_gyousyu <- c(
+    "全産業",
+    "医療・福祉",
+    "運輸・郵便業",
+    "卸売・小売業",
+    "教育・学習支援業",
+    "金融・保険業",
+    "建設業",
+    "公務",
+    "サービス業",
+    "情報通信業",
+    "製造業"
+  )
   
   tagList(
     fluidRow(
@@ -80,12 +63,17 @@ analysis_table_module_ui <- function(id) {
 }
 
 
-# --- 3. 表描画モジュールサーバー (`analysis_table_module_server`) ---
+# 表描画モジュールサーバー -------
 analysis_table_module_server <- function(id,
                                          processed_current_year_data, # reactive({ tibble })
                                          processed_previous_year_data) { # reactive({ tibble | NULL })
   
   moduleServer(id, function(input, output, session) {
+    
+    hensati_data <- read_csv("modules/table11.csv")
+    nbjsq <- read_csv("modules/nbjsq_question_text.csv")
+    nbjsqlabs <- read_csv("modules/nbjsq_label_hensati.csv")
+    
     ns <- session$ns
     
     #過去データがない場合にdiffや過去の表示はさせない
@@ -224,7 +212,7 @@ analysis_table_module_server <- function(id,
       
       #reactableでの描画
       reactable(
-        hyou,#display_data(),# hyou,
+        hyou,
         defaultColDef = sets$default_col_def,
         columns = sets$column_setting_list,
         columnGroups = sets$col_group_list,
@@ -252,38 +240,3 @@ analysis_table_module_server <- function(id,
     
   })
 }
-
-
-# --- 4. モジュールをテストするためのスタンドアロンアプリ ---
-# ダミーデータの作成
-dummy_current_data <- read_csv("../demodata/processed_nbjsq_dummy_data1_alpha.csv")
-dummy_previous_data <- read_csv("../demodata/processed_nbjsq_dummy_data2_alpha.csv")
-
-
-
-# ---- アプリUI ----
-ui <- dashboardPage(
-  dashboardHeader(title = "表描画モジュール テスト (reactable版)"),
-  dashboardSidebar(),
-  dashboardBody(
-    analysis_table_module_ui("analysis_table")
-  )
-)
-
-# ---- アプリサーバー ----
-server <- function(input, output, session) {
-  
-  current_data_reactive <- reactive({ dummy_current_data })
-  #previous_data_reactive <- reactive({ dummy_previous_data })
-  previous_data_reactive <- reactive({ NULL })
-  
-  analysis_table_module_server(
-    id = "analysis_table",
-    processed_current_year_data = current_data_reactive,
-    processed_previous_year_data = previous_data_reactive
-  )
-  
-}
-
-# --- 5. アプリケーションの実行 ---
-shinyApp(ui, server)

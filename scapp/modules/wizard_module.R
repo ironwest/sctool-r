@@ -1,28 +1,11 @@
-# 必要ライブラリ (ファイルの先頭にまとめて記述することを推奨)
-library(shiny)
-library(shinydashboard)
-library(DT) # dataTableOutputのため
-library(jsonlite) # 設定ファイルのJSON処理のため
-library(readr)
-library(stringr)
-library(purrr)
-library(dplyr)
-library(tidyr)
-
-# マッピング後のデータからスコア計算を行う関数の読み込み
-source("calculate_scores.R")
-
 # `%||%` 演算子 (NULL の場合にデフォルト値を返すヘルパー)
 `%||%` <- function(a, b) if (!is.null(a)) a else b
 
-
-#値マッピング用で利用する質問番号の順番に質問の文章が含まれるベクトル
-qtext <- read_csv("nbjsq_question_text.csv") |> dplyr::pull(qtext)
-
-# --- ウィザードモジュール UI (wizard_module_ui) ---
-# (前の回答で提供された wizard_module_ui のコードをここに記述)
 wizard_module_ui <- function(id) {
   ns <- NS(id) # 名前空間関数を取得
+  
+  #値マッピング用で利用する質問番号の順番に質問の文章が含まれるベクトル
+  qtext <- read_csv("modules/nbjsq_question_text.csv") |> dplyr::pull(qtext)
   
   # 値マッピングのタブUI(可読性アップのため)-----------------
   overall_value_mapping_tabpanel <- 
@@ -255,11 +238,10 @@ wizard_module_ui <- function(id) {
     )
 }
 
-
 # --- ウィザードモジュール サーバー (wizard_module_server) ---
 wizard_module_server <- function(id, year_label) {
   moduleServer(id, function(input, output, session) {
-    ns <- session$ns # 名前空間関数をサーバー内で取得
+    ns <- session$ns 
     # --- リアクティブ値の初期化 ----
     rv <- reactiveValues(
       wizard_step = 1,
@@ -353,7 +335,7 @@ wizard_module_server <- function(id, year_label) {
     })
     
     # --- ステップ2: 列名マッピング ---------------------
-    # NBJSQ列マッピングUI
+    ## NBJSQ列マッピングUI ----
     header_first_numbers <- reactive({as.numeric(str_extract(rv$csv_headers,"\\d+"))})
     observe({
       map(1:80, ~{
@@ -371,7 +353,7 @@ wizard_module_server <- function(id, year_label) {
     })
     
     
-    # 列マッピング設定の読み込み
+    ## 列マッピング設定の読み込み----
     observeEvent(input$col_map_config_load_input, {
       req(input$col_map_config_load_input, rv$csv_headers)
       tryCatch({
@@ -391,11 +373,10 @@ wizard_module_server <- function(id, year_label) {
         updateSelectInput(session, "map_dept2_column", choices = header_choices, selected = rv$column_map_dept2)
         
         if (!is.null(config$nbjsq_questions) && length(config$nbjsq_questions) == 80) {
-          # config$nbjsq_questions が名前付きリストであることを期待
           loaded_nbjsq_map <- config$nbjsq_questions
           if(is.list(loaded_nbjsq_map) && !is.null(names(loaded_nbjsq_map))){
             rv$column_map_nbjsq <- loaded_nbjsq_map
-          } else if (is.vector(loaded_nbjsq_map) && length(loaded_nbjsq_map) == 80) { # 古い形式のベクトルかもしれない
+          } else if (is.vector(loaded_nbjsq_map) && length(loaded_nbjsq_map) == 80) {
             rv$column_map_nbjsq <- stats::setNames(as.list(loaded_nbjsq_map), paste0("q", 1:80))
           }
           
@@ -409,7 +390,7 @@ wizard_module_server <- function(id, year_label) {
       })
     })
     
-    # 列マッピング設定の保存
+    ## 列マッピング設定の保存 ----
     output$col_map_config_save_button <- downloadHandler(
       filename = function() {
         paste0("column_mapping_config_", year_label, "_", Sys.Date(), ".json")
@@ -445,10 +426,9 @@ wizard_module_server <- function(id, year_label) {
       }
     )
     
-    ## 前に戻るボタン----------------
+    ## 前後移動ボタン----------------
     observeEvent(input$back_to_step1_button, { rv$wizard_step <- 1 })
     
-    ## 次に進むボタン-------------------
     observeEvent(input$goto_step3_button, {
       rv$column_map_empid <- input$map_empid_column %||% ""
       rv$column_map_empid <- input$map_empid_column %||% ""
@@ -466,7 +446,6 @@ wizard_module_server <- function(id, year_label) {
     
     # --- ステップ3: 値マッピング -----------------------------
     get_unique_values_from_mapped_column <- function(mapped_column_name_in_rv_list_element) {
-      # mapped_column_name_in_rv_list_element は rv$column_map_gender や rv$column_map_nbjsq[['q1']] のような実際の列名を指す
       req(rv$csv_data, mapped_column_name_in_rv_list_element)
       actual_column_name <- mapped_column_name_in_rv_list_element
       
@@ -499,7 +478,7 @@ wizard_module_server <- function(id, year_label) {
           column(width = 2, strong(paste0("Q", q_num))),
           lapply(1:4, function(i) {
             column(width = 2,
-                   selectInput(paste0(input_id_prefix_for_select, "_q", q_num, "_val", i), # このIDでinputから値を取得
+                   selectInput(paste0(input_id_prefix_for_select, "_q", q_num, "_val", i), 
                                label = NULL,
                                choices = choices_list,
                                selected = selected_vals_for_q[[i]] %||% ""
@@ -510,11 +489,11 @@ wizard_module_server <- function(id, year_label) {
       tagList(
         fluidRow(column(width = 2, ""), lapply(scale_labels, function(lbl) column(width = 2, strong(lbl)))),
         hr(),
-        do.call(tagList, question_uis) # question_uisはリストのリストなので、適切に展開
+        do.call(tagList, question_uis)
       )
     }
     
-    # --- 値マッピングUIのchoicesとselectedを更新する observe ブロック -------
+    ## --- 値マッピングUIのchoicesとselectedを更新する-------
     observe({
       req(rv$wizard_step == 3, rv$csv_data, rv$column_map_gender, rv$column_map_nbjsq) # ステップ3かつ必要なデータがある場合
       
@@ -590,7 +569,7 @@ wizard_module_server <- function(id, year_label) {
     )
     
     
-    # --- 値マッピング設定の読み込み ---
+    ## --- 値マッピング設定の読み込み ------
     observeEvent(input$val_map_config_load_input, {
       req(input$val_map_config_load_input)
       tryCatch({
@@ -644,13 +623,11 @@ wizard_module_server <- function(id, year_label) {
         
         # 3. 個別設定用 (UIからrvへ)
         # UI側のinputId: ns(paste0("vmap_q",.,"_1"))
-        # (nsはサーバー側では自動的に解決されるのでinput$vmap_qX_Yでアクセス)
         current_individual_map <- stats::setNames(lapply(1:80, function(x) rep(list(""), 4)), paste0("q", 1:80))
         for(q_num in 1:80){
           q_id_str <- paste0("q", q_num)
           vals_for_q <- sapply(1:4, function(val_idx) {
             # UIのinputIdは ns(paste0("vmap_q", q_num, "_", val_idx)) なので、
-            # サーバー側では input[[paste0("vmap_q", q_num, "_", val_idx)]] で取得
             input[[paste0("vmap_q", q_num, "_", val_idx)]] %||% ""
           })
           current_individual_map[[q_id_str]] <- as.list(vals_for_q)
@@ -671,7 +648,7 @@ wizard_module_server <- function(id, year_label) {
     observeEvent(input$back_to_step2_button, { rv$wizard_step <- 2 })
     
     # --- ステップ4: 最終決定後の処理 -----------------------------
-    observeEvent(input$finish_setup_button, { # または適切なトリガー
+    observeEvent(input$finish_setup_button, { 
       req(rv$csv_data, rv$column_map_nbjsq, rv$value_map_nbjsq_individual) # 必要な設定が完了しているか
       
       # 1. 元データ (rv$csv_data) を取得
@@ -765,61 +742,3 @@ wizard_module_server <- function(id, year_label) {
     )
   })
 }
-
-
-# --- アプリケーション実行のためのUIとサーバー ---
-ui <- dashboardPage(
-  dashboardHeader(title = "ウィザードテストアプリ"),
-  dashboardSidebar(
-    sidebarMenu(
-      id = "main_tabs", # sidebarMenuにはIDを振ることが推奨される
-      menuItem("今年度設定", tabName = "current_year_tab", icon = icon("calendar-plus")),
-      menuItem("昨年度設定", tabName = "previous_year_tab", icon = icon("calendar-minus"))
-    )
-  ),
-  dashboardBody(
-    tabItems(
-      tabItem(tabName = "current_year_tab",
-              h2("今年度データ設定ウィザード"),
-              wizard_module_ui("current_year_wizard") # モジュールUI呼び出し (ID指定)
-      ),
-      tabItem(tabName = "previous_year_tab",
-              h2("昨年度データ設定ウィザード"),
-              wizard_module_ui("previous_year_wizard") # 別のIDでモジュールUI呼び出し
-      )
-    )
-  )
-)
-
-server <- function(input, output, session) {
-  # 今年度ウィザードモジュールのサーバーロジック呼び出し
-  current_year_results <- wizard_module_server("current_year_wizard", year_label = "今年度")
-  
-  # 昨年度ウィザードモジュールのサーバーロジック呼び出し
-  previous_year_results <- wizard_module_server("previous_year_wizard", year_label = "昨年度")
-  
-  # モジュールの返り値を利用する例 (デバッグ用)
-  observe({
-    req(current_year_results$is_setup_complete()) # setupが完了したら
-    
-    if (current_year_results$is_setup_complete()) {
-      cat("今年度の設定が完了しました。\n")
-      current_year_results$get_csv_data()
-      current_year_results$get_column_map()
-      current_year_results$get_value_map()
-      current_year_results$is_setup_complete()
-      print(str(current_year_results$get_column_map()))
-      
-      # print(str(current_year_results$get_value_map()))
-    }
-  })
-  observe({
-    req(previous_year_results$is_setup_complete())
-    if (previous_year_results$is_setup_complete()) {
-      cat("昨年度の設定が完了しました。\n")
-    }
-  })
-}
-
-# アプリケーションの実行
-shinyApp(ui, server)

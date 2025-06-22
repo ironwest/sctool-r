@@ -1,8 +1,10 @@
-source("calculate_hensati.r")
-source("calculate_scores.r")
-source("calculate_sougoukrisk.r")
-
-calculate_hensati_hyou <- function(current_data, hensati_data, target_sheet, group_vars,nbjsq, nbjsqlabs, target_gyousyu, target_longorcross, precise = FALSE){
+calculate_hensati_hyou <- function(current_data, 
+                                   hensati_data, 
+                                   target_sheet, 
+                                   group_vars,nbjsq, 
+                                   nbjsqlabs, 
+                                   target_gyousyu, 
+                                   target_longorcross, precise = FALSE){
   
   #偏差値表を作成する
   hyou <- calculate_hensati(
