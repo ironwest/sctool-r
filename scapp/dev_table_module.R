@@ -33,8 +33,7 @@ ui <- dashboardPage(
 server <- function(input, output, session) {
   
   current_data_reactive <- reactive({ dummy_current_data })
-  #previous_data_reactive <- reactive({ dummy_previous_data })
-  previous_data_reactive <- reactive({ NULL })
+  previous_data_reactive <- reactive({ dummy_previous_data })
   
   analysis_table_module_server(
     id = "analysis_table",

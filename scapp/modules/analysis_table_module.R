@@ -70,6 +70,11 @@ analysis_table_module_server <- function(id,
   
   moduleServer(id, function(input, output, session) {
     
+    rv <- reactiveValues(
+      no_previous_data = FALSE,
+      no_current_data = FALSE
+    )
+    
     hensati_data <- read_csv("modules/table11.csv")
     nbjsq <- read_csv("modules/nbjsq_question_text.csv")
     nbjsqlabs <- read_csv("modules/nbjsq_label_hensati.csv")
@@ -78,16 +83,39 @@ analysis_table_module_server <- function(id,
     
     #過去データがない場合にdiffや過去の表示はさせない
     observe({
-      no_previous_data <- is.null(processed_previous_year_data())
-      if(no_previous_data){
+      rv$no_previous_data <- is.null(processed_previous_year_data())
+      rv$no_current_data <- is.null(processed_current_year_data())
+      if(rv$no_previous_data){
         updateSelectInput(session,"display_mode", "表示モードの選択",
                           choices = c("偏差値(今回)" = "hensati"))
-      }else{
+        
+        showModal(modalDialog(
+          "過去分のストレスチェックデータが読み込まれていないため差分の結果の表示はできません。",
+          title = "過去データが読み込まれていません", 
+          footer = modalButton("OK")
+        ))
+        
+      }else if(!rv$no_current_data & !rv$no_previous_data){
         updateSelectInput(session,"display_mode", "表示モードの選択",
                     choices = c("偏差値(今回)" = "hensati",
                                 "前回との差" = "diff",
                                 "偏差値(前回)" = "hensati_prev"))
+      }else if(rv$no_current_data){
+        updateActionButton(session, "update_table_button", disabled = TRUE)
+        
+        showModal(modalDialog(
+          "今年度分のストレスチェックデータが読み込まれていないため結果の表示はできません。",
+          title = "今年度分データが読み込まれていません", 
+          footer = modalButton("OK")
+        ))
       }
+      
+      
+      
+    })
+    
+    observe({
+      
     })
     
     display_data <- eventReactive(input$update_table_button, {
