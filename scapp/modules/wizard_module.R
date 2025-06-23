@@ -303,13 +303,24 @@ wizard_module_server <- function(id, year_label) {
     
     # --- ウィザード進捗インジケーター ----
     output$wizard_step_indicator_ui <- renderUI({
-      step_names <- c("1. CSVアップロード", "2. 列名マッピング", "3. 値マッピング", "4. 完了")
+      step_names <- c("1. CSVアップロード", "2. 列名マッピング", "3. 値マッピング", "4. 完了", "4'. 完了")
       current_step_name <- step_names[rv$wizard_step]
+      
+      if(!is.null(rv$wizard_step)){
+        if(rv$wizard_step > 4){
+          stepval <- 4
+        }else{
+          stepval <- rv$wizard_step
+        }
+      }else{
+        stepval <- 1
+      }
+      
       tagList(
         h4(paste0(year_label, " 設定 - 現在のステップ: ", current_step_name)),
         div(style = "background-color: #eee; border-radius: 5px; height: 20px;",
-            div(style = paste0("background-color: #337ab7; width:", (rv$wizard_step/4)*100, "%; height: 100%; border-radius: 5px; text-align: center; color: white; line-height: 20px;"),
-                paste0(round((rv$wizard_step/4)*100), "%")
+            div(style = paste0("background-color: #337ab7; width:", (stepval/4)*100, "%; height: 100%; border-radius: 5px; text-align: center; color: white; line-height: 20px;"),
+                paste0(round((stepval/4)*100), "%")
             )
         )
       )
@@ -779,23 +790,28 @@ wizard_module_server <- function(id, year_label) {
           check_columns_message <- ""
         }
         
-        #数値が1－4のみかのチェック
-        values <- df |> 
-          select(matches("q\\d+")) |> 
-          pivot_longer(everything()) |> 
-          pull(value) |> 
-          unique()
-        
-        if(!all(values %in% c(1,2,3,4))){
-          check_values <- TRUE
-          check_values_message <- "設問の回答状況が1,2,3,4以外の数字が含まれており不正です。"
+        if(!check_columns){
+          #数値が1－4のみかのチェック
+          values <- df |> 
+            select(matches("q\\d+")) |> 
+            pivot_longer(everything()) |> 
+            pull(value) |> 
+            unique()
+          
+          if(!all(values %in% c(1,2,3,4))){
+            check_values <- TRUE
+            check_values_message <- "設問の回答状況が1,2,3,4以外の数字が含まれており不正です。"
+          }else{
+            check_values <- FALSE 
+            check_values_message <- ""
+          }  
         }else{
-          check_values <- FALSE 
+          check_values <- TRUE
           check_values_message <- ""
         }
         
         
-        if(all(check_columns, check_values)){
+        if(all(!check_columns, !check_values)){
           #エラーチェックをすべてクリア
           rv$processed_data <- df    
           rv$wizard_step <- 5  
@@ -803,7 +819,7 @@ wizard_module_server <- function(id, year_label) {
           #エラーが一つでもある
           showModal(
             modalDialog(
-              str_c(check_values_message,"<br>",check_values_message)
+              str_c(check_columns_message,"/",check_values_message)
             )
           )
         }
