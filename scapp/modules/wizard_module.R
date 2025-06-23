@@ -99,7 +99,7 @@ wizard_module_ui <- function(id) {
     uiOutput(ns("wizard_step_indicator_ui")),
     hr(),
 
-    ## ステップ1: CSVファイルのアップロード ------
+    ## ステップ1&1': CSVファイルのアップロード ------
     conditionalPanel(
       condition = paste0("output['", ns("wizard_show_step1"), "'] == true"),
       div(
@@ -113,7 +113,7 @@ wizard_module_ui <- function(id) {
                   buttonLabel = "ファイルを選択...",
                   placeholder = "ファイルが選択されていません"),
         textOutput(ns("csv_upload_status_text")),
-        dataTableOutput(ns("csv_preview_table")),
+        reactable::reactableOutput(ns("csv_preview_table")),
         br(),
         actionButton(ns("goto_step2_button"), "次へ：列名マッピング", class = "btn-primary", icon = icon("arrow-right")),
         div(style = "border-bottom: 2px dotted #000; margin-top: 15px; margin-bottom: 15px;"),
@@ -227,7 +227,7 @@ wizard_module_ui <- function(id) {
         actionButton(ns("finish_setup_button"), "設定完了", class = "btn-success", icon = icon("check"))
       )),
       
-      ## ステップ4: データ加工の終了と分析画面への ----------------------
+    ## ステップ4: データ加工の終了と分析画面への ----------------------
       conditionalPanel(
         condition = paste0("output['", ns("wizard_show_step4"), "'] == true"),
         div(
@@ -244,11 +244,22 @@ wizard_module_ui <- function(id) {
             )
           )
         )
+      ),
+    ## ステップ5：加工済みデータ取り込みの終了と分析画面への案内-------------------
+      conditionalPanel(
+        condition = paste0("output['", ns("wizard_show_step5"), "'] == true"),
+        div(
+          id = ns("step5_ui"),
+          h3("データの取り込みの完了"),
+          p("データの取り込みが完了いたしました。"),
+          p("今年度分と昨年度分の2年度分のデータの取り込みを行うと、分析ツールをすべて利用できます"),
+          p("今年度分だけしかない場合は、回帰分析ツールの利用ができません。また、分析結果は一部データが欠損した状態で出力されますのでご留意ください。")
+        )
       )
     )
 }
 
-# --- ウィザードモジュール サーバー (wizard_module_server) ---
+# Server本体----
 wizard_module_server <- function(id, year_label) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns 
@@ -283,10 +294,12 @@ wizard_module_server <- function(id, year_label) {
     output$wizard_show_step2 <- reactive({ rv$wizard_step == 2 })
     output$wizard_show_step3 <- reactive({ rv$wizard_step == 3 })
     output$wizard_show_step4 <- reactive({ rv$wizard_step == 4 })
+    output$wizard_show_step5 <- reactive({ rv$wizard_step == 5 })
     outputOptions(output, "wizard_show_step1", suspendWhenHidden = FALSE)
     outputOptions(output, "wizard_show_step2", suspendWhenHidden = FALSE)
     outputOptions(output, "wizard_show_step3", suspendWhenHidden = FALSE)
     outputOptions(output, "wizard_show_step4", suspendWhenHidden = FALSE)
+    outputOptions(output, "wizard_show_step5", suspendWhenHidden = FALSE)
     
     # --- ウィザード進捗インジケーター ----
     output$wizard_step_indicator_ui <- renderUI({
@@ -303,6 +316,7 @@ wizard_module_server <- function(id, year_label) {
     })
     
     # --- ステップ1: CSVアップロード ------------
+    ## oe: input$csv_file_input------------
     observeEvent(input$csv_file_input, {
       req(input$csv_file_input)
       tryCatch({
@@ -323,19 +337,20 @@ wizard_module_server <- function(id, year_label) {
           paste(year_label, "ファイル読み込み成功:", nrow(df), "行、", ncol(df), "列検出。")
         })
         
-        output$csv_preview_table <- renderDataTable({
-          head(df, 5)
-        }, options = list(scrollX = TRUE, pageLength = 5, searching = FALSE, lengthChange = FALSE))
+        output$csv_preview_table <- reactable::renderReactable({
+          reactable(head(df, 5))
+        })#, options = list(scrollX = TRUE, pageLength = 5, searching = FALSE, lengthChange = FALSE))
       }, error = function(e) {
         rv$csv_data <- NULL
         rv$csv_headers <- NULL
         output$csv_upload_status_text <- renderText({
           paste(year_label, "ファイル読み込みエラー:", e$message)
         })
-        output$csv_preview_table <- renderDataTable(NULL)
+        output$csv_preview_table <- renderReactable(NULL)
       })
     })
     
+    ## oe: input$goto_step2_button ---------------
     observeEvent(input$goto_step2_button, {
       if (!is.null(rv$csv_data)) {
         rv$wizard_step <- 2
@@ -345,7 +360,7 @@ wizard_module_server <- function(id, year_label) {
     })
     
     # --- ステップ2: 列名マッピング ---------------------
-    ## NBJSQ列マッピングUI ----
+    ## NBJSQ列マッピングUI -------
     header_first_numbers <- reactive({as.numeric(str_extract(rv$csv_headers,"\\d+"))})
     observe({
       map(1:80, ~{
@@ -727,6 +742,74 @@ wizard_module_server <- function(id, year_label) {
         readr::write_csv(rv$processed_data,file)
       }
     )
+    
+    # ステップ1'：処理済みファイルの読み込み---------------
+    observeEvent(input$read_processed_csv_button, {
+    
+      if(is.null(input$processed_file_input)){
+        showModal(modalDialog("ファイルを選択してください。"))
+      }else{
+        df <- readr::read_csv(file=input$processed_file_input$datapath)
+        
+        #読み込んだDFファイルのエラーチェック
+        #列名のチェック
+        required_columns <- c(
+          "empid", "age", "age_kubun", "gender", "dept1", "dept2",
+          str_c("q",1:80),
+          "A", "B","C","is_hs",
+          str_c("q", 1:80, "_score"),
+          "b_antreward","b_bossfair","b_bossleader","b_bosssupp",
+          "b_collsupp","b_ecoreward","b_homeru","b_sippai",
+          "b_sonreward","j_carrier","j_change","j_dei","j_jinji",
+          "j_keiei","j_kojin","j_wsbpos","na_cc","na_famsupp",
+          "na_kateimanzoku","na_workmanzoku","o_harass",
+          "o_sc","o_we","p_hirou","p_huan","p_iraira","p_kakki",
+          "p_utu","s_control","s_ginou","s_growth","s_igi",
+          "s_tek","s_yakuwarimei","w_env","w_hutan","w_jyoutyo",
+          "w_qua","w_tai","w_vol","w_wsbneg","w_yakuwarikat",
+          "b_total","j_total","p_total","s_total","w_total",
+          "demand","control","boss_support","fellow_support"
+        )
+        
+        if(!all(required_columns %in% colnames(df))){
+          check_columns <- TRUE
+          check_columns_message <- "列名が不正です。"
+        }else{
+          check_columns <- FALSE  
+          check_columns_message <- ""
+        }
+        
+        #数値が1－4のみかのチェック
+        values <- df |> 
+          select(matches("q\\d+")) |> 
+          pivot_longer(everything()) |> 
+          pull(value) |> 
+          unique()
+        
+        if(!all(values %in% c(1,2,3,4))){
+          check_values <- TRUE
+          check_values_message <- "設問の回答状況が1,2,3,4以外の数字が含まれており不正です。"
+        }else{
+          check_values <- FALSE 
+          check_values_message <- ""
+        }
+        
+        
+        if(all(check_columns, check_values)){
+          #エラーチェックをすべてクリア
+          rv$processed_data <- df    
+          rv$wizard_step <- 5  
+        }else{
+          #エラーが一つでもある
+          showModal(
+            modalDialog(
+              str_c(check_values_message,"<br>",check_values_message)
+            )
+          )
+        }
+      }
+    })
+    
     
     
     return(

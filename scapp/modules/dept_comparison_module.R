@@ -387,8 +387,6 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
     })
     
     
-    
-    
     # レポートダウンロードハンドラー-----------------------
     output$download_report_button <- downloadHandler(
       filename = function() {
@@ -406,25 +404,6 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
       },
       content = function(file) {
         req(analysis_results())
-        
-        if(FALSE){ #デバッグ用
-          browser()
-          
-          ardat <- analysis_results()
-          
-          # パラメータを準備
-          report_params <<- list(
-            dept1 = input$target_dept1,
-            dept2 = input$target_dept2,
-            skr_gyousyu = input$gyousyu,
-            skr_longcross = input$long_or_cross,
-            bench_gyousyu = input$bench_gyousyu,
-            display_type = input$analysis_displaytype,
-            rendering_data = ardat
-          )
-          
-          write_rds(report_params,"repparam.rds", compress="gz")
-        }
         
         #プログレスバーを表示する
         progress <- shiny::Progress$new()
