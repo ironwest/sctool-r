@@ -7,6 +7,7 @@ library(stringr)
 library(purrr)
 library(dplyr)
 library(tidyr)
+library(reactable)
 
 source("modules/wizard_module.R")
 
