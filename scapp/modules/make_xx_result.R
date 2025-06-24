@@ -19,9 +19,7 @@ make_ghbase_result <- function(hyou_oa_now,
   if(nrow(hyou_past)==0){
     hyou_past    <- hyou_past |> add_row(`時期` = "前回", `対象` = target_grp_name)
   }
-  
-  
-  
+
   if(!is.null(percent_this)){
     hyou_oa_now <- hyou_oa_now |> mutate(across(all_of(percent_this), ~{round(100*., digits = 1)}))
     hyou_now <- hyou_now |> mutate(across(all_of(percent_this), ~{round(100*., digits = 1)}))

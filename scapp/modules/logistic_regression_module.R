@@ -13,6 +13,7 @@ analysis_regression_module_ui <- function(id) {
         fluidRow(
           column(width = 4,
                  selectInput(ns("outcome_var"), "目的変数（今年度データから）", choices = NULL),
+                 p("is_hs変数が高ストレス者の有無を表す変数です。"),
                  # プレビュー表示エリアを追加
                  uiOutput(ns("outcome_preview_ui")),
                  # 閾値設定UIはプレビューUIの中で動的に表示
@@ -54,6 +55,34 @@ analysis_regression_module_server <- function(id,
         mutate(across(matches("^q"), as.factor))
     })
     
+    #過去データがない場合はエラーをModalでユーザーに警告
+    observe({
+      
+      isnull_now  <- is.null(processed_current_year_data())
+      isnull_past <- is.null(processed_previous_year_data())
+      # 
+      # if(isnull_now & isnull_past){
+      #   showModal(modalDialog(
+      #     "今年と過去のデータが存在しないため分析できません。",
+      #     footer = modalButton("OK")
+      #   ))
+      # }else if(isnull_now & !isnull_past){
+      #   showModal(modalDialog(
+      #    "今年のデータが存在しないため分析できません。",
+      #     footer = modalButton("OK")
+      #   ))
+      # }else if(!isnull_now & isnull_past){
+      #   showModal(modalDialog(
+      #    "昨年のデータが存在しないため分析できません。",
+      #     footer = modalButton("OK")
+      #   ))
+      # }
+      
+      # if(isnull_now | isnull_past){
+      #   updateActionButton(session, "run_regression_button",disabled = TRUE)
+      # }
+    })
+    
     # UIの選択肢を動的に更新
     observe({
       req(processed_current_year_data(), processed_previous_year_data())
@@ -65,7 +94,7 @@ analysis_regression_module_server <- function(id,
       # 説明変数の候補 (数値)
       choices_past <- colnames(data_past)
       
-      updateSelectInput(session, "outcome_var", choices = choices_now)
+      updateSelectInput(session, "outcome_var", choices = choices_now, selected = "is_hs")
       updateSelectizeInput(session, "predictor_vars", choices = choices_past)
     })
     
@@ -147,59 +176,71 @@ analysis_regression_module_server <- function(id,
     
     # 分析結果を保持するリアクティブな値------
     analysis_results <- eventReactive(input$run_regression_button, {
-      req(
-        processed_current_year_data(),
-        processed_previous_year_data(),
-        input$outcome_var,
-        input$predictor_vars
-      )
+      # req(
+      #   processed_current_year_data(),
+      #   processed_previous_year_data(),
+      #   input$outcome_var,
+      #   input$predictor_vars
+      # )
       
       data_now <- processed_current_year_data()
       data_past <- data_past()
       
-      # 目的変数（今年度）と empid を選択
-      outcome_data <- data_now |>
-        select(empid, outcome_col = all_of(input$outcome_var))
-      
-      # 目的変数の二値化
-      # 連続変数の場合:
-      if(is.numeric(outcome_data$outcome_col)){
-        req(input$outcome_threshold)
-        outcome_data <- outcome_data |>
-          mutate(outcome_binary = if_else(outcome_col >= input$outcome_threshold, 1, 0))
-      } else {
-        # カテゴリー変数の場合: 最初のカテゴリーを1、それ以外を0とする
-        first_category <- unique(na.omit(outcome_data$outcome_col))[1]
-        showNotification(paste0("カテゴリー変数 '", first_category, "' を1、その他を0として分析します。"), type="warning")
-        outcome_data <- outcome_data |>
-          mutate(outcome_binary = if_else(outcome_col == first_category & !is.na(outcome_col), 1, 0))
+      if(is.null(data_now) | is.null(data_past)){
+        
+        showModal(modalDialog(
+         "データが存在しないため分析できません。",
+          footer = modalButton("OK")
+        ))
+        
+        return()
+      }else{
+        # 目的変数（今年度）と empid を選択
+        outcome_data <- data_now |>
+          select(empid, outcome_col = all_of(input$outcome_var))
+        
+        # 目的変数の二値化
+        # 連続変数の場合:
+        if(is.numeric(outcome_data$outcome_col)){
+          req(input$outcome_threshold)
+          outcome_data <- outcome_data |>
+            mutate(outcome_binary = if_else(outcome_col >= input$outcome_threshold, 1, 0))
+        } else {
+          # カテゴリー変数の場合: 最初のカテゴリーを1、それ以外を0とする
+          first_category <- unique(na.omit(outcome_data$outcome_col))[1]
+          showNotification(paste0("カテゴリー変数 '", first_category, "' を1、その他を0として分析します。"), type="warning")
+          outcome_data <- outcome_data |>
+            mutate(outcome_binary = if_else(outcome_col == first_category & !is.na(outcome_col), 1, 0))
+        }
+        outcome_data <- outcome_data |> select(empid, outcome_binary)
+        
+        all_predictors <- input$predictor_vars
+        predictor_data <- data_past |>
+          select(empid, all_of(all_predictors))
+        model_data <- inner_join(outcome_data, predictor_data, by = "empid") |>
+          na.omit() 
+        
+        if (nrow(model_data) < 50 || length(unique(model_data$outcome_binary)) < 2) {
+          showNotification("分析対象データが不足しているか、結果が1種類しかないため分析を実行できません。", type = "error")
+          return(NULL)
+        }
+        
+        formula_str <- paste("outcome_binary ~", paste(all_predictors, collapse = " + "))
+        model <- glm(as.formula(formula_str), data = model_data, family = binomial(link = "logit"))
+        
+        model_summary <- summary(model)
+        coefficients_table <- broom::tidy(model, conf.int = TRUE, exponentiate = TRUE) |>
+          rename(
+            odds_ratio = estimate,
+            conf_low_or = conf.low,
+            conf_high_or = conf.high
+          ) |>
+          mutate(across(where(is.numeric), ~round(.x, 3)))
+        
+        return(list(summary = model_summary, coefficients = coefficients_table))
       }
-      outcome_data <- outcome_data |> select(empid, outcome_binary)
       
-      all_predictors <- input$predictor_vars
-      predictor_data <- data_past |>
-        select(empid, all_of(all_predictors))
-      model_data <- inner_join(outcome_data, predictor_data, by = "empid") |>
-        na.omit() 
       
-      if (nrow(model_data) < 50 || length(unique(model_data$outcome_binary)) < 2) {
-        showNotification("分析対象データが不足しているか、結果が1種類しかないため分析を実行できません。", type = "error")
-        return(NULL)
-      }
-      
-      formula_str <- paste("outcome_binary ~", paste(all_predictors, collapse = " + "))
-      model <- glm(as.formula(formula_str), data = model_data, family = binomial(link = "logit"))
-      
-      model_summary <- summary(model)
-      coefficients_table <- broom::tidy(model, conf.int = TRUE, exponentiate = TRUE) |>
-        rename(
-          odds_ratio = estimate,
-          conf_low_or = conf.low,
-          conf_high_or = conf.high
-        ) |>
-        mutate(across(where(is.numeric), ~round(.x, 3)))
-      
-      return(list(summary = model_summary, coefficients = coefficients_table))
     })
     
     # 結果の出力

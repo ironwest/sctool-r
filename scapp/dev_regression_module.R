@@ -11,7 +11,7 @@ library(ggplot2) # ヒストグラム描画のために追加
 source("modules/logistic_regression_module.R")
 
 # --- 4. スタンドアロンアプリ ---
-dummy_current_data <- read_csv("demodata/processed_nbjsq_dummy_data1_alpha.csv")
+dummy_current_data <- NULL#read_csv("demodata/processed_nbjsq_dummy_data1_alpha.csv")
 dummy_previous_data <- read_csv("demodata/processed_nbjsq_dummy_data2_alpha.csv")
 
 ui <- dashboardPage(
