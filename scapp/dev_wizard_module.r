@@ -7,7 +7,6 @@ library(stringr)
 library(purrr)
 library(dplyr)
 library(tidyr)
-library(reactable)
 
 source("modules/wizard_module.R")
 source("modules/calculate_scores.R")
