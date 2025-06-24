@@ -163,10 +163,6 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
     # --- 分析実行 (変更なし) ---
     gen_analysis_results <- function(data_now, data_past,level, targetdept1, targetdept2, gyousyu, long_or_cross,bench_gyousyu,analysis_displaytype){
       
-      if(is.null(data_past)){
-        data_past <- data_now |> filter(FALSE)
-      }
-      
       #datanowの処理--------------------
       
       if(level == "dept1"){
@@ -214,29 +210,21 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
         mutate(color_this = grp == target_grp_name)
       
       #datapastの処理--------------------------
-      if(level == "dept1"){
-        data_past <- data_past |> mutate(grp = dept1)
-        target_grp_name <- targetdept1
-      }else if(level == "dept1_dept2"){
-        data_past <- data_past |> mutate(grp = str_c(dept1,"-",dept2))
-        target_grp_name <- str_c(targetdept1,"-",targetdept2)
-      }
-      
-      hyou_past <- calculate_hensati_hyou(
-        current_data = data_past, 
-        hensati_data = hensati_data, 
-        target_sheet = "全体", #全体以外は現時点ではなし 
-        group_vars = "grp", 
-        nbjsq = nbjsq, 
-        nbjsqlabs = nbjsqlabs,
-        target_gyousyu = gyousyu,
-        target_longorcross = long_or_cross,
-        precise=TRUE
-      )
-      
-      hyou_oa_past <- data_past |> 
-        mutate(grp = "全体") |> 
-        calculate_hensati_hyou(
+      if(is.null(data_past)){
+        data_past <- data_now |> filter(FALSE)
+        hyou_oa_past <- hyou_oa_now |> filter(FALSE)
+        hyou_past <- hyou_now |> filter(FALSE)
+      }else{
+        if(level == "dept1"){
+          data_past <- data_past |> mutate(grp = dept1)
+          target_grp_name <- targetdept1
+        }else if(level == "dept1_dept2"){
+          data_past <- data_past |> mutate(grp = str_c(dept1,"-",dept2))
+          target_grp_name <- str_c(targetdept1,"-",targetdept2)
+        }
+        
+        hyou_past <- calculate_hensati_hyou(
+          current_data = data_past, 
           hensati_data = hensati_data, 
           target_sheet = "全体", #全体以外は現時点ではなし 
           group_vars = "grp", 
@@ -246,18 +234,32 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
           target_longorcross = long_or_cross,
           precise=TRUE
         )
-      
-      hyou_oa_past <- hyou_oa_past |> 
-        mutate(`時期` = "前回") |> 
-        mutate(`対象` = grp) |> 
-        mutate(`高ストレス者割合(%)` = scales::percent(`高ストレス者割合`, accuracy=0.1))
-      
-      hyou_past    <- hyou_past    |> 
-        mutate(`時期` = "前回") |> 
-        mutate(`対象` = grp) |> 
-        mutate(`高ストレス者割合(%)` = scales::percent(`高ストレス者割合`, accuracy=0.1)) |> 
-        mutate(color_this = grp == target_grp_name)
- 
+        
+        hyou_oa_past <- data_past |> 
+          mutate(grp = "全体") |> 
+          calculate_hensati_hyou(
+            hensati_data = hensati_data, 
+            target_sheet = "全体", #全体以外は現時点ではなし 
+            group_vars = "grp", 
+            nbjsq = nbjsq, 
+            nbjsqlabs = nbjsqlabs,
+            target_gyousyu = gyousyu,
+            target_longorcross = long_or_cross,
+            precise=TRUE
+          )
+        
+        hyou_oa_past <- hyou_oa_past |> 
+          mutate(`時期` = "前回") |> 
+          mutate(`対象` = grp) |> 
+          mutate(`高ストレス者割合(%)` = scales::percent(`高ストレス者割合`, accuracy=0.1))
+        
+        hyou_past    <- hyou_past    |> 
+          mutate(`時期` = "前回") |> 
+          mutate(`対象` = grp) |> 
+          mutate(`高ストレス者割合(%)` = scales::percent(`高ストレス者割合`, accuracy=0.1)) |> 
+          mutate(color_this = grp == target_grp_name)
+      }
+       
       #グラフとテーブルを設定データをもとに作成する------------------------------------
       ghres <- tibble()
       for(i in 1:length(ghsetting)){

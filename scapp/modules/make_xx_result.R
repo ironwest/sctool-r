@@ -128,8 +128,6 @@ make_hanteizu_result <- function(hyou_oa_now,
                                  risk_calc_setting, 
                                  tgtsyokusyu){
   
-  browser()
-  
   set_bunrui <- asetting$bunrui
   set_name <- asetting$name
   set_select_these <- asetting$select_these
@@ -187,8 +185,6 @@ make_hanteizu_result <- function(hyou_oa_now,
     pivot_wider(id_cols = name, values_from = value, names_from = c(grp,`時期`)) |> 
     relocate(all_of(col_order))
   
-  
-  
   benchdata_hyou <- benchdata_long |> 
     mutate(coefname = case_when(
       coefname == as.character(name_mapper[1]) ~ names(name_mapper[1]),
@@ -211,8 +207,12 @@ make_hanteizu_result <- function(hyou_oa_now,
   col_list[[str_c(target_grp_name,"_前回")]] <- colDef(name = "前回", align="left")
   col_list[["name"]] <- colDef(name = "項目", align="left" )
   
-  hh <- reactable(hdat, columns = col_list, columnGroups = col_group_list)  
+  if(all(is.na(hdat$`全体_前回`))){
+    hdat <- hdat |> 
+      mutate(across(matches("_前回"), ~"-"))
+  }
   
+  hh <- reactable(hdat, columns = col_list, columnGroups = col_group_list)  
   
   hexcel <- tibble::lst(
     hdat, col_group_list, col_list
@@ -243,17 +243,13 @@ make_gh_result <- function(hyou_oa_now,
                            mode="gh", 
                            display_type = "average"){
   
-  browser()
-  
   select_these <- asetting$select_these
   plot_this <- asetting$plot_this
   percent_this <- asetting$percent_this
   set_bunrui <- asetting$bunrui
   set_name <- asetting$name
   
-  
   # ベンチマークの設定#---------------------------------------------------------------
-  
   bench_data <- hensati_data |> 
     filter(qtype == "NBJSQ") |> 
     filter(sheet == tgtnbjsq_gyousyu) |> 
@@ -270,8 +266,8 @@ make_gh_result <- function(hyou_oa_now,
   
   if(!is.null(percent_this)){
     hyou_oa_now <- hyou_oa_now |> mutate(across(all_of(percent_this), ~{round(100*., digits = 1)}))
-    hyou_oa_past <- hyou_oa_past |> mutate(across(all_of(percent_this), ~{round(100*., digits = 1)}))
     hyou_now <- hyou_now |> mutate(across(all_of(percent_this), ~{round(100*., digits = 1)}))
+    hyou_oa_past <- hyou_oa_past |> mutate(across(all_of(percent_this), ~{round(100*., digits = 1)}))
     hyou_past <- hyou_past |> mutate(across(all_of(percent_this), ~{round(100*., digits = 1)}))
   }
   
@@ -279,6 +275,16 @@ make_gh_result <- function(hyou_oa_now,
     prefix <- ""
   }else if(display_type == "average"){
     prefix <- "average_"
+  }
+  
+  if(nrow(hyou_oa_past)==0){
+    hyou_oa_past <- hyou_oa_past |> 
+      add_row(`時期` = "前回", `対象` = "全体")
+  }
+  
+  if(nrow(hyou_past)==0){
+    hyou_past <- hyou_past |> 
+      add_row(`時期` = "前回", `対象` = target_grp_name)
   }
   
   hyou <- bind_rows(
@@ -321,6 +327,11 @@ make_gh_result <- function(hyou_oa_now,
     pivot_longer(cols = !c(`対象`,`時期`)) |> 
     pivot_wider(id_cols = `name`, names_from = c(`対象`,`時期`), values_from = value) |> 
     left_join(bench_data |> rename(`ベンチマーク` = `平均値`), by=c("name"="尺度名bench"))
+  
+  if(all(is.na(hyou2$全体_前回))){
+    hyou2 <- hyou2 |> 
+      mutate(across(matches("前回"),~{"-"}))
+  }
   
   hh <- reactable(hyou2, columnGroups = col_group_list, columns = col_list)
 
@@ -382,12 +393,6 @@ make_qq_result <- function(data_now,
                            target_grp_name, 
                            asetting, nbjsq, 
                            nbjsq_answerlabs){
-
-  browser()
-  
-  data_now <- data_now
-  data_past <- data_past
-  target_grp_name <- target_grp_name
   
   set_bunrui <- asetting$bunrui
   set_name <- asetting$name
@@ -417,8 +422,6 @@ make_qq_result <- function(data_now,
   hdat <- textdata |> 
     left_join(ansdata, by="qnum") |> 
     left_join(labeldata, by="qnum")
-  
-  hdat <<- hdat
   
   bar_style <- function(width = 1, fill = "#e6e6e6", height = "65%",
                         align = c("left", "right"), color = NULL) {
