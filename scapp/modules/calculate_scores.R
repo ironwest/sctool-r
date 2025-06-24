@@ -5,7 +5,8 @@ library(dplyr)
 library(stringr)
 
 calculate_scores <- function(d){
-  
+  #TODO:欠損データがある場合の処理
+  browser()
   qmapper <- read_csv("nbjsq_question_text.csv")
   
   nbjsqscore <- qmapper |> 

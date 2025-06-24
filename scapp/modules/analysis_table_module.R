@@ -36,7 +36,8 @@ analysis_table_module_ui <- function(id) {
                  selectInput(ns("display_mode"), "表示モードの選択",
                              choices = c("偏差値(今回)" = "hensati",
                                          "前回との差" = "diff",
-                                         "偏差値(前回)" = "hensati_prev"))
+                                         "偏差値(前回)" = "hensati_prev")),
+                 numericInput(ns("limitnumber"),"分析対象の最低人数を設定する",value=10, min=5)
           ),
           column(width = 4,
                  selectInput(ns("gyousyu"), "総合健康リスク計算の業種の選択",
@@ -109,14 +110,9 @@ analysis_table_module_server <- function(id,
           footer = modalButton("OK")
         ))
       }
-      
-      
-      
+
     })
-    
-    observe({
-      
-    })
+
     
     display_data <- eventReactive(input$update_table_button, {
       req(processed_current_year_data())
@@ -216,6 +212,8 @@ analysis_table_module_server <- function(id,
     # テーブルのレンダリング (renderDataTable から renderReactable に変更)
     output$summary_table <- renderReactable({
       req(display_data())
+      
+      
   
       group_vars <- isolate({switch(input$grouping_var,
              "dept1" = "dept1",
@@ -237,6 +235,18 @@ analysis_table_module_server <- function(id,
       
       #高ストレス者割合が少数なので100倍する
       hyou <- hyou |>  mutate(`高ストレス者割合` = 100*高ストレス者割合)
+      
+      #limitnumber以下の人数に描画を制限する
+      limitnum <- isolate(input$limitnumber)
+      
+      
+      hyou <- hyou |> 
+        mutate(ishide = (`受検人数`-`不完全回答人数`)<limitnum) |> 
+        mutate(across(.cols = !c(`受検人数`,`不完全回答人数`,ishide, matches("dept")),
+                      .fns = ~ if_else(ishide,NA,.)
+                      )) |> 
+        select(!ishide)
+      
       
       #reactableでの描画
       reactable(

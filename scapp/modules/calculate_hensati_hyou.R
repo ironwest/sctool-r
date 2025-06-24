@@ -31,11 +31,20 @@ calculate_hensati_hyou <- function(current_data,
   }
   
   #高ストレス者の人数と割合を計算する
+  
+  anyna <- current_data |> 
+    select(tempid,matches("q\\d+")) |> 
+    pivot_longer(cols = !tempid) |> 
+    group_by(tempid) |> 
+    summarise(isanyna = sum(is.na(value)))
+  
+  current_data <- current_data |> left_join(anyna, by="tempid")
+    
   hyouhs <- current_data |> 
     group_by(across(all_of(group_vars))) |> 
     summarise(
       `受検人数` = n(),
-      `不完全回答人数` = sum(is.na(is_hs)),
+      `不完全回答人数` = sum(isanyna>0),
       `高ストレス者人数` = sum(is_hs, na.rm=TRUE),
       `高ストレス者割合` = `高ストレス者人数`/`受検人数`
     )

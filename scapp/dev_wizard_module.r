@@ -10,6 +10,7 @@ library(tidyr)
 library(reactable)
 
 source("modules/wizard_module.R")
+source("modules/calculate_scores.R")
 
 
 # --- アプリケーション実行のためのUIとサーバー ---
