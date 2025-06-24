@@ -22,6 +22,7 @@ source("modules/dept_comparison_module.R")
 source("modules/logistic_regression_module.R")
 
 # _moduleで利用する関数と設定値
+source("modules/calculate_scores.R")
 source("modules/calculate_hensati.R")
 source("modules/calculate_sougoukrisk.R")
 source("modules/calculate_hensati_hyou.R")
