@@ -13,13 +13,21 @@ make_ghbase_result <- function(hyou_oa_now,
   set_name <- asetting$name
   name_mapper <- asetting$name_mapper
   
-  if(!is.null(percent_this)){
-    hyou_oa_now <- hyou_oa_now |> mutate(across(all_of(percent_this), ~{round(100*., digits = 1)}))
-    hyou_oa_past <- hyou_oa_past |> mutate(across(all_of(percent_this), ~{round(100*., digits = 1)}))
-    hyou_now <- hyou_now |> mutate(across(all_of(percent_this), ~{round(100*., digits = 1)}))
-    hyou_past <- hyou_past |> mutate(across(all_of(percent_this), ~{round(100*., digits = 1)}))
+  if(nrow(hyou_oa_past)==0){
+    hyou_oa_past <- hyou_oa_past |> add_row(`時期` = "前回", `対象` = "全体")
+  }
+  if(nrow(hyou_past)==0){
+    hyou_past    <- hyou_past |> add_row(`時期` = "前回", `対象` = target_grp_name)
   }
   
+  
+  
+  if(!is.null(percent_this)){
+    hyou_oa_now <- hyou_oa_now |> mutate(across(all_of(percent_this), ~{round(100*., digits = 1)}))
+    hyou_now <- hyou_now |> mutate(across(all_of(percent_this), ~{round(100*., digits = 1)}))
+    hyou_oa_past <- hyou_oa_past |> mutate(across(all_of(percent_this), ~{round(100*., digits = 1)}))  
+    hyou_past <- hyou_past |> mutate(across(all_of(percent_this), ~{round(100*., digits = 1)}))
+  }
   
   hyou <- bind_rows(
     hyou_oa_now  |>  select(all_of(c("時期", "対象", select_these))),
@@ -55,6 +63,11 @@ make_ghbase_result <- function(hyou_oa_now,
   hyou2 <- hyou |> 
     pivot_longer(cols = !c(`対象`,`時期`)) |> 
     pivot_wider(id_cols = `name`, names_from = c(`対象`,`時期`), values_from = value) 
+  
+  if(all(is.na(hyou2$`全体_前回`))){
+    hyou2 <- hyou2 |> 
+      mutate(across(matches("_前回"), ~{"-"}))
+  }
   
   if(set_name == "総合健康リスク"){
     hyou2 <- hyou2 |> 
@@ -115,6 +128,8 @@ make_hanteizu_result <- function(hyou_oa_now,
                                  risk_calc_setting, 
                                  tgtsyokusyu){
   
+  browser()
+  
   set_bunrui <- asetting$bunrui
   set_name <- asetting$name
   set_select_these <- asetting$select_these
@@ -157,6 +172,11 @@ make_hanteizu_result <- function(hyou_oa_now,
   
   col_order <- c("name",str_c("全体",c("_今回","_前回")),str_c(target_grp_name,c("_今回","_前回")))
   
+  if(nrow(gdat_past)==0){
+    gdat_past <- gdat_past |> 
+      add_row(grp = c("全体", target_grp_name))
+  }
+  
   hdat <- bind_rows(
     gdat_now  |> filter(grp %in% c("全体",target_grp_name)) |> mutate(`時期` = "今回") |> select(`時期`,`grp`,all_of(set_select_these)),
     gdat_past |> filter(grp %in% c("全体",target_grp_name)) |> mutate(`時期` = "前回") |> select(`時期`,`grp`,all_of(set_select_these))
@@ -166,6 +186,8 @@ make_hanteizu_result <- function(hyou_oa_now,
     pivot_longer(cols = !c("時期","grp")) |> 
     pivot_wider(id_cols = name, values_from = value, names_from = c(grp,`時期`)) |> 
     relocate(all_of(col_order))
+  
+  
   
   benchdata_hyou <- benchdata_long |> 
     mutate(coefname = case_when(
@@ -220,6 +242,8 @@ make_gh_result <- function(hyou_oa_now,
                            asetting, 
                            mode="gh", 
                            display_type = "average"){
+  
+  browser()
   
   select_these <- asetting$select_these
   plot_this <- asetting$plot_this
@@ -359,6 +383,8 @@ make_qq_result <- function(data_now,
                            asetting, nbjsq, 
                            nbjsq_answerlabs){
 
+  browser()
+  
   data_now <- data_now
   data_past <- data_past
   target_grp_name <- target_grp_name

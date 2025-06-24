@@ -113,6 +113,16 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     
+    rv <- reactiveValues(
+      is_data_now = TRUE,
+      is_data_past = TRUE
+    )
+    
+    observe({
+      rv$is_data_now <- !is.null(processed_data_now())
+      rv$is_data_past <- !is.null(processed_data_past())
+    })
+    
     hensati_data      <- read_csv("modules/table11.csv")
     nbjsq             <- read_csv("modules/nbjsq_question_text.csv")
     nbjsq_answerlabs  <- read_csv("modules/nbjsq_answer_labels.csv")
@@ -128,8 +138,6 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
     
     
     # --- UIの動的更新 ---
-    
-    
     observe({
       req(processed_data_now())
       data <- processed_data_now()
@@ -155,18 +163,20 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
     # --- 分析実行 (変更なし) ---
     gen_analysis_results <- function(data_now, data_past,level, targetdept1, targetdept2, gyousyu, long_or_cross,bench_gyousyu,analysis_displaytype){
       
+      if(is.null(data_past)){
+        data_past <- data_now |> filter(FALSE)
+      }
+      
+      #datanowの処理--------------------
       
       if(level == "dept1"){
         data_now <- data_now |> mutate(grp = dept1)
-        data_past <- data_past |> mutate(grp = dept1)
         target_grp_name <- targetdept1
       }else if(level == "dept1_dept2"){
         data_now <- data_now |> mutate(grp = str_c(dept1,"-",dept2))
-        data_past <- data_past |> mutate(grp = str_c(dept1,"-",dept2))
         target_grp_name <- str_c(targetdept1,"-",targetdept2)
       }
       
-      #データの加工-----------------------------------------
       hyou_now <- calculate_hensati_hyou(
         current_data = data_now, 
         hensati_data = hensati_data, 
@@ -191,6 +201,26 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
           target_longorcross = long_or_cross,
           precise=TRUE
         )
+      
+      hyou_oa_now  <- hyou_oa_now  |> 
+        mutate(`時期` = "今回") |> 
+        mutate(`対象` = grp) |> 
+        mutate(`高ストレス者割合(%)` = scales::percent(`高ストレス者割合`, accuracy=0.1))
+      
+      hyou_now     <- hyou_now     |> 
+        mutate(`時期` = "今回") |> 
+        mutate(`対象` = grp) |> 
+        mutate(`高ストレス者割合(%)` = scales::percent(`高ストレス者割合`, accuracy=0.1)) |> 
+        mutate(color_this = grp == target_grp_name)
+      
+      #datapastの処理--------------------------
+      if(level == "dept1"){
+        data_past <- data_past |> mutate(grp = dept1)
+        target_grp_name <- targetdept1
+      }else if(level == "dept1_dept2"){
+        data_past <- data_past |> mutate(grp = str_c(dept1,"-",dept2))
+        target_grp_name <- str_c(targetdept1,"-",targetdept2)
+      }
       
       hyou_past <- calculate_hensati_hyou(
         current_data = data_past, 
@@ -217,29 +247,17 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
           precise=TRUE
         )
       
-      hyou_oa_now  <- hyou_oa_now  |> 
-        mutate(`時期` = "今回") |> 
-        mutate(`対象` = grp) |> 
-        mutate(`高ストレス者割合(%)` = scales::percent(`高ストレス者割合`, accuracy=0.1))
-      
       hyou_oa_past <- hyou_oa_past |> 
         mutate(`時期` = "前回") |> 
         mutate(`対象` = grp) |> 
         mutate(`高ストレス者割合(%)` = scales::percent(`高ストレス者割合`, accuracy=0.1))
-      
-      hyou_now     <- hyou_now     |> 
-        mutate(`時期` = "今回") |> 
-        mutate(`対象` = grp) |> 
-        mutate(`高ストレス者割合(%)` = scales::percent(`高ストレス者割合`, accuracy=0.1)) |> 
-        mutate(color_this = grp == target_grp_name)
       
       hyou_past    <- hyou_past    |> 
         mutate(`時期` = "前回") |> 
         mutate(`対象` = grp) |> 
         mutate(`高ストレス者割合(%)` = scales::percent(`高ストレス者割合`, accuracy=0.1)) |> 
         mutate(color_this = grp == target_grp_name)
-      
-      
+ 
       #グラフとテーブルを設定データをもとに作成する------------------------------------
       ghres <- tibble()
       for(i in 1:length(ghsetting)){
