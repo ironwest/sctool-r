@@ -53,6 +53,7 @@ ui <- dashboardPage(
                menuSubItem("昨年度データ設定", tabName = "previous_year_setup")
       ),
       menuItem("分析", tabName = "analysis", icon = icon("chart-bar"),
+               menuSubItem("集計表", tabName = "analysis_table"),
                menuSubItem("部署比較分析", tabName = "dept_comparison"),
                menuSubItem("要因探索 (回帰分析)", tabName = "regression_analysis")
       )

@@ -90,11 +90,11 @@ analysis_table_module_server <- function(id,
         updateSelectInput(session,"display_mode", "表示モードの選択",
                           choices = c("偏差値(今回)" = "hensati"))
         
-        showModal(modalDialog(
-          "過去分のストレスチェックデータが読み込まれていないため差分の結果の表示はできません。",
-          title = "過去データが読み込まれていません", 
-          footer = modalButton("OK")
-        ))
+        # showModal(modalDialog(
+        #   "過去分のストレスチェックデータが読み込まれていないため差分の結果の表示はできません。",
+        #   title = "過去データが読み込まれていません", 
+        #   footer = modalButton("OK")
+        # ))
         
       }else if(!rv$no_current_data & !rv$no_previous_data){
         updateSelectInput(session,"display_mode", "表示モードの選択",
@@ -104,11 +104,11 @@ analysis_table_module_server <- function(id,
       }else if(rv$no_current_data){
         updateActionButton(session, "update_table_button", disabled = TRUE)
         
-        showModal(modalDialog(
-          "今年度分のストレスチェックデータが読み込まれていないため結果の表示はできません。",
-          title = "今年度分データが読み込まれていません", 
-          footer = modalButton("OK")
-        ))
+        # showModal(modalDialog(
+        #   "今年度分のストレスチェックデータが読み込まれていないため結果の表示はできません。",
+        #   title = "今年度分データが読み込まれていません", 
+        #   footer = modalButton("OK")
+        # ))
       }
 
     })
