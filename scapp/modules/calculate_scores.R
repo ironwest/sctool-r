@@ -5,9 +5,8 @@ library(dplyr)
 library(stringr)
 
 calculate_scores <- function(d){
-  #TODO:欠損データがある場合の処理
-  browser()
-  qmapper <- read_csv("nbjsq_question_text.csv")
+
+  qmapper <- read_csv("modules/nbjsq_question_text.csv")
   
   nbjsqscore <- qmapper |> 
     select(qnum, is_reverse)
@@ -79,6 +78,7 @@ calculate_scores <- function(d){
     summarise(hsscore = sum(hsscore, na.rm=FALSE), .groups="drop") |> 
     pivot_wider(id_cols = tempid, names_from = area, values_from = hsscore) |> 
     mutate(is_hs = case_when(
+      is.na(A) | is.na(B) | is.na(C) ~ NA,
       B >= 77 ~ TRUE,
       A+C >= 76 & B>=63 ~ TRUE,
       TRUE ~ FALSE

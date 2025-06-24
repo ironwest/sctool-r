@@ -798,7 +798,7 @@ wizard_module_server <- function(id, year_label) {
             pull(value) |> 
             unique()
           
-          if(!all(values %in% c(1,2,3,4))){
+          if(!all(values %in% c(1,2,3,4,NA))){
             check_values <- TRUE
             check_values_message <- "設問の回答状況が1,2,3,4以外の数字が含まれており不正です。"
           }else{

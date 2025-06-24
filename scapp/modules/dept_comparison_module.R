@@ -294,15 +294,18 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
     analysis_results <- eventReactive(input$run_comparison, {
       req(processed_data_now(), input$target_dept1)
       
-      res <- gen_analysis_results(data_now = processed_data_now(),
-                           data_past = processed_data_past(),
-                           level = input$level_select,
-                           targetdept1 = input$target_dept1,
-                           targetdept2 = input$target_dept2,
-                           gyousyu = input$gyousyu,
-                           long_or_cross = input$long_or_cross,
-                           bench_gyousyu = input$bench_gyousyu,
-                           analysis_displaytype = input$analysis_displaytype)
+      tryCatch({
+        res <- gen_analysis_results(data_now = processed_data_now(),
+                                    data_past = processed_data_past(),
+                                    level = input$level_select,
+                                    targetdept1 = input$target_dept1,
+                                    targetdept2 = input$target_dept2,
+                                    gyousyu = input$gyousyu,
+                                    long_or_cross = input$long_or_cross,
+                                    bench_gyousyu = input$bench_gyousyu,
+                                    analysis_displaytype = input$analysis_displaytype)
+      }, error = function(e) {res <- tibble() })
+      
       
       
       
