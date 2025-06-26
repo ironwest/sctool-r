@@ -25,8 +25,8 @@ source("modules/make_excel_report.R")
 
 # スタンドアロンアプリ ---
 # ダミーデータ
-dummy_current_data <- NULL#read_csv("demodata/processed_nbjsq_dummy_data1_alpha.csv")
-dummy_previous_data <- NULL#read_csv("demodata/processed_nbjsq_dummy_data2_alpha.csv")
+dummy_current_data <- read_csv("demodata/processed_nbjsq_dummy_data1_alpha.csv")
+dummy_previous_data <- read_csv("demodata/processed_nbjsq_dummy_data2_alpha.csv")
 
 
 

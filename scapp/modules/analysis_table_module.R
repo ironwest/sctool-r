@@ -236,7 +236,7 @@ analysis_table_module_server <- function(id,
       #高ストレス者割合が少数なので100倍する
       hyou <- hyou |>  mutate(`高ストレス者割合` = 100*高ストレス者割合)
       
-      #limitnumber以下の人数に描画を制限する
+      #limitnumber未満の人数に描画を制限する
       limitnum <- isolate(input$limitnumber)
       
       

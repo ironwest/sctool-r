@@ -73,7 +73,6 @@ make_ghbase_result <- function(hyou_oa_now,
       mutate(name = factor(name, levels = name_mapper, labels = names(name_mapper)))
   }
   
-  
   hh <- reactable(hyou2, columnGroups = col_group_list, columns = col_list)
   
   hexcel <- tibble::lst(
@@ -210,6 +209,8 @@ make_hanteizu_result <- function(hyou_oa_now,
       mutate(across(matches("_前回"), ~"-"))
   }
   
+  browser()
+  
   hh <- reactable(hdat, columns = col_list, columnGroups = col_group_list)  
   
   hexcel <- tibble::lst(
@@ -331,6 +332,8 @@ make_gh_result <- function(hyou_oa_now,
       mutate(across(matches("前回"),~{"-"}))
   }
   
+  browser()
+  
   hh <- reactable(hyou2, columnGroups = col_group_list, columns = col_list)
 
   if(mode == "gh"){
@@ -340,6 +343,8 @@ make_gh_result <- function(hyou_oa_now,
     }else if(display_type == "hensati"){
       avg_bench <- 50
     }
+    
+    browser()
     
     gdat <- hyou_now |> 
       select(busyo = `対象`, color_this, plotthis = all_of(str_c(prefix,plot_this))) |>
@@ -490,6 +495,8 @@ make_qq_result <- function(data_now,
                                 width = 300)
         
       )
+      
+      browser()
       
       return(
         list(
