@@ -38,7 +38,7 @@ source("modules/make_excel_report.R")
 `%||%` <- function(a, b) if (!is.null(a)) a else b
 
 #値マッピング用で利用する質問番号の順番に質問の文章が含まれるベクトル
-qtext <- read_csv("nbjsq_question_text.csv") |> dplyr::pull(qtext)
+qtext <- read_csv("modules/nbjsq_question_text.csv") |> dplyr::pull(qtext)
 
 # --- アプリケーションUIの定義 ---
 ui <- dashboardPage(

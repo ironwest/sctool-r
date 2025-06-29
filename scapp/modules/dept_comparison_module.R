@@ -100,11 +100,11 @@ dept_comparison_module_ui <- function(id) {
           )
         ),
         hr(),
-        p("以下のボタンから、分析結果をまとめたExcelのレポートとしてダウンロードできます。（20－30秒レポート作成にかかります）"),
+        p("以下のボタンから、分析結果をまとめたExcelのレポートとしてダウンロードできます。（20－30秒レポート作成にかかります）。開始すると止められません"),
         downloadButton(ns("download_report_button"), "Excelレポートをダウンロード", icon = icon("file-excel")),
-        hr(),
-        p("以下のボタンで、全部署のレポートを作成します実行時間が長くなる場合があるため、注意してください。"),
-        downloadButton(ns("download_all_report_button"), "全部署のExcelレポートをダウンロード", icon = icon("folder"))
+        # hr(),
+        # p("以下のボタンで、全部署のレポートを作成します実行時間が長くなる場合があるため、注意してください。"),
+        # downloadButton(ns("download_all_report_button"), "全部署のExcelレポートをダウンロード", icon = icon("folder"))
       )
     )
   )

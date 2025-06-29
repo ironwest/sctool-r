@@ -264,8 +264,8 @@ make_excel_report <- function(report_params, filepath, progress){
       }
       
       
-      print(gg)
-      wb$add_plot(shtname, dims = "E5", width = 18, height = graphheight*0.80, file_type = "png", units = "cm", dpi=150)
+      # print(gg)
+      # wb$add_plot(shtname, dims = "E5", width = 18, height = graphheight*0.80, file_type = "png", units = "cm", dpi=150)
     }else{
       
       wb$add_data(shtname,"グラフなし", dims="A3")

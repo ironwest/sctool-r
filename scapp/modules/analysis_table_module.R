@@ -35,7 +35,7 @@ analysis_table_module_ui <- function(id) {
           column(width = 4,
                  selectInput(ns("display_mode"), "表示モードの選択",
                              choices = c("偏差値(今回)" = "hensati",
-                                         "前回との差" = "diff",
+                                         #"前回との差" = "diff",
                                          "偏差値(前回)" = "hensati_prev")),
                  numericInput(ns("limitnumber"),"分析対象の最低人数を設定する",value=10, min=5)
           ),
@@ -238,7 +238,6 @@ analysis_table_module_server <- function(id,
       
       #limitnumber未満の人数に描画を制限する
       limitnum <- isolate(input$limitnumber)
-      
       
       hyou <- hyou |> 
         mutate(ishide = (`受検人数`-`不完全回答人数`)<limitnum) |> 
