@@ -1,50 +1,13 @@
 # app.R
-
-library(shiny)
-library(shinydashboard)
-library(jsonlite)
-library(readr)
-library(stringr)
-library(purrr)
-library(dplyr)
-library(tidyr)
-library(reactable)
-library(shinycssloaders)
-library(ggplot2)
-library(broom)
-library(openxlsx2)
-library(showtext) 
-
-# モジュールUI/サーバーと、各種ヘルパー関数を読み込む
-source("modules/wizard_module.R")
-source("modules/analysis_table_module.R")
-source("modules/dept_comparison_module.R")
-source("modules/logistic_regression_module.R")
-
-# _moduleで利用する関数と設定値
-source("modules/calculate_scores.R")
-source("modules/calculate_hensati.R")
-source("modules/calculate_sougoukrisk.R")
-source("modules/calculate_hensati_hyou.R")
-
-source("modules/setting_hensati_hyou.R")
-source("modules/setting_gh_analysis.R") #ghsetting
-source("modules/setting_bench_mapper.R")
-
-source("modules/make_xx_result.R")
-source("modules/make_excel_report.R")
-
-# `%||%` 演算子 (NULL の場合にデフォルト値を返すヘルパー)
-`%||%` <- function(a, b) if (!is.null(a)) a else b
-
-#値マッピング用で利用する質問番号の順番に質問の文章が含まれるベクトル
-qtext <- read_csv("modules/nbjsq_question_text.csv") |> dplyr::pull(qtext)
+# global.Rでライブラリやソースは読み込み済み
 
 # --- アプリケーションUIの定義 ---
 ui <- dashboardPage(
   skin = "blue",
   dashboardHeader(title = "ストレスチェック集団分析"),
   dashboardSidebar(
+    # shinyjsを有効化
+    shinyjs::useShinyjs(),
     sidebarMenu(
       id = "main_tabs",
       menuItem("はじめに", tabName = "welcome", icon = icon("info-circle")),
@@ -52,7 +15,7 @@ ui <- dashboardPage(
                menuSubItem("今年度データ設定", tabName = "current_year_setup"),
                menuSubItem("昨年度データ設定", tabName = "previous_year_setup")
       ),
-      menuItem("分析", tabName = "analysis", icon = icon("chart-bar"),
+      menuItem("分析", tabName = "analysis_menu", icon = icon("chart-bar"),
                menuSubItem("集計表", tabName = "analysis_table"),
                menuSubItem("部署比較分析", tabName = "dept_comparison"),
                menuSubItem("要因探索 (回帰分析)", tabName = "regression_analysis")
@@ -92,7 +55,7 @@ ui <- dashboardPage(
 )
 
 
-# --- 3. アプリケーションサーバーの定義 ---
+# --- アプリケーションサーバーの定義 ---
 server <- function(input, output, session) {
   
   # --- モジュールサーバーの呼び出しとデータ連携 ---
@@ -100,6 +63,22 @@ server <- function(input, output, session) {
   # データ設定ウィザードモジュールを呼び出し
   current_year_data <- wizard_module_server("current_year_wizard", year_label = "今年度")
   previous_year_data <- wizard_module_server("previous_year_wizard", year_label = "昨年度")
+
+  # --- UIの動的制御 ---
+  # 今年度のデータが設定されるまで分析タブを無効化する
+  observe({
+    # is_setup_completeはreactiveなので()をつけて呼び出す
+    if (isTRUE(current_year_data$is_setup_complete())) {
+      # menuItemのdata-valueは自動でtabNameと同じになる
+      shinyjs::enable(selector = "a[data-value='analysis_table']")
+      shinyjs::enable(selector = "a[data-value='dept_comparison']")
+      shinyjs::enable(selector = "a[data-value='regression_analysis']")
+    } else {
+      shinyjs::disable(selector = "a[data-value='analysis_table']")
+      shinyjs::disable(selector = "a[data-value='dept_comparison']")
+      shinyjs::disable(selector = "a[data-value='regression_analysis']")
+    }
+  })
   
   # 表描画モジュールの呼び出し
   analysis_table_module_server(
@@ -124,5 +103,5 @@ server <- function(input, output, session) {
 }
 
 
-# --- 4. アプリケーションの実行 ---
+# --- アプリケーションの実行 ---
 shinyApp(ui, server)
