@@ -1,7 +1,7 @@
 # 表描画モジュールUI----------------------
 analysis_table_module_ui <- function(id) {
   ns <- NS(id) # 名前空間を取得
-  
+
   skrisk_gyousyu <- c(
     "全産業",
     "医療・福祉",
@@ -15,7 +15,7 @@ analysis_table_module_ui <- function(id) {
     "情報通信業",
     "製造業"
   )
-  
+
   tagList(
     fluidRow(
       box(
