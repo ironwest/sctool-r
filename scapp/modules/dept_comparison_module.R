@@ -1,5 +1,3 @@
-# TODO: 集団解析で、10人未満部署を一つにまとめる方法
-
 # モジュールUI-------------------------
 dept_comparison_module_ui <- function(id) {
   ns <- NS(id)
@@ -61,7 +59,7 @@ dept_comparison_module_ui <- function(id) {
                  selectInput(ns("long_or_cross"), "総合健康リスク計算の種類",
                              choices = c("縦断(推奨)" = "long","横断" = "cross")),
                  h4("分析最低人数の設定"),
-                 numericInput(ns("numlimit"),label = "集団分析の最小人数",min = 5, value=10)
+                 numericInput(ns("numlimit"),label = "集団分析の最小人数",min = 5, value=10),
           ),
           column(width = 4, 
                  h4("ベンチマーク職種の設定"),
