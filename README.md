@@ -85,7 +85,7 @@ install.packages("shiny","shinydashboard","shinyjs","jsonlite","readr","stringr"
 
 ![image](https://github.com/user-attachments/assets/caaa6425-08d2-418c-89aa-bb54273d8bac)
 
-このとき、`Run Aoo`という緑の▶がついているボタンをクリックしてください。
+このとき、`Run App`という緑の▶がついているボタンをクリックしてください。
 
 ![image](https://github.com/user-attachments/assets/3a54fb54-8a63-4b63-95c4-807b140d6901)
 
