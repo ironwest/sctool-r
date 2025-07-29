@@ -47,8 +47,46 @@ R言語とRStudioDesktopのインストール方法がわからないという�
 
 ### プログラムのダウンロードと解凍
 
-こちらのページの右上
+こちらのページの右上のCODEから、Download ZIPを選択してZIPファイルをダウンロードしてください。
+![image](https://github.com/user-attachments/assets/74713e0d-ff5b-47da-bffe-fb89ee7956f3)
+
+ダウンロードしたZIPファイルを解凍して好きな場所においてください。
+
+開いたファイルの中にある、`scrool-r.Rproj`をダブルクリックすると、RStudioが立ち上がります。
+
+### 必要なパッケージのインストール
+
+はじめて利用する場合に、ツールが動作するうえで必要な追加のライブラリ（機能）をインストールする必要があります。
+RStudioを起動した場合に、以下のような画面が起動するはずです。
+
+![image](https://github.com/user-attachments/assets/2e2ae81e-3557-4eab-8a49-44ddb9d11ff6)
+
+このとき、「Console」となっている画面を探してください。（画像では、画面左上にConsoleという窓が表示されています。設定によっては右側に来ている場合もあるので注意ください）
+
+このConsoleと表示されている窓に、以下のコマンドを入力（コピーして）Enterキーを入力してください。
+
+```r
+install.packages("shiny","shinydashboard","shinyjs","jsonlite","readr","stringr","purrr","dplyr","tidyr","reactable","shinycssloaders","ggplot2","broom","openxlsx2","showtext")
+```
+
+![image](https://github.com/user-attachments/assets/00ac830c-98c2-43cd-bcff-16e3f30dc669)
 
 
-4. 必要なパッケージのインストール
-5. アプリケーションの実行
+必要な機能がインストールされるためしばらく待ちます。
+
+![image](https://github.com/user-attachments/assets/4cc1fadd-e251-4964-92f2-d55211c017d3)
+
+`＞`という記号で入力ができるようになったらインストール完了です。
+
+### アプリケーションの実行
+
+必要なパッケージのインストールが終われば、scappフォルダの中にあるapp.RをRStudio上で開きます。
+右下のFilesと書いてある窓からapp.Rをクリックすると以下のような画面になるはずです。
+
+![image](https://github.com/user-attachments/assets/caaa6425-08d2-418c-89aa-bb54273d8bac)
+
+このとき、`Run App`という緑の▶がついているボタンをクリックしてください。
+
+![image](https://github.com/user-attachments/assets/3a54fb54-8a63-4b63-95c4-807b140d6901)
+
+パッケージのインストールなどが無事に終了しているとアプリケーションは動作するはずです。
