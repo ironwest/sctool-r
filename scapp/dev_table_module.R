@@ -18,8 +18,6 @@ source("modules/setting_hensati_hyou.R")
 dummy_current_data <- read_csv("demodata/processed_nbjsq_dummy_data1_alpha.csv")
 dummy_previous_data <- read_csv("demodata/processed_nbjsq_dummy_data2_alpha.csv")
 
-
-
 # ---- アプリUI ----
 ui <- dashboardPage(
   dashboardHeader(title = "表描画モジュール テスト (reactable版)"),

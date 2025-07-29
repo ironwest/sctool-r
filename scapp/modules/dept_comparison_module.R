@@ -476,126 +476,127 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
           rendering_data = analysis_results()
         )
         
-        #TODO: Add info panel for rendering report
         make_excel_report(report_params, file, progress)
         
       }
     )
     
-    output$download_all_report_button <- downloadHandler(
-      filename = function(){
-        if(input$level_select=="dept1"){
-          filename <- "大分類.zip"
-        }else if(input$level_select == "dept1_dept2"){
-          filename <- "大分類-中分類.zip"
-        }
-        
-        return(filename)
-      },
-      content = function(file){
-        temp_report_dir <- file.path(tempdir(), paste0("reports_", as.integer(Sys.time())))
-        dir.create(temp_report_dir)
-
-        progress1 <- shiny::Progress$new()
-        progress1$set(message = "全部署レポートを作成中", value = 0)
-        on.exit(progress1$close())
-        
-        #選択されているものを固定する(念のため
-        gyousyu <- input$gyousyu
-        long_or_cross <- input$long_or_cross
-        bench_gyousyu <- input$bench_gyousyu
-        analysis_displaytype <- input$analysis_displaytype
-        
-        #choiceを再度取得
-        data <- processed_data_now()
-        level <- input$level_select
-      
-        dept1_choice <- unique(data$dept1) |> sort()
-        dept2_choice <- data |> 
-          filter(dept1 == input$target_dept1) |> 
-          pull(dept2) |> 
-          unique() |> 
-          sort()
-        
-        if(level == "dept1_dept2"){
-          #10人以上だけ出力する
-          choices <- data |> count(dept1, dept2) |> filter(n >= 10)
-        }else if(level == "dept1"){
-          choices <- data |> count(dept1) |> filter(n >= 10)
-        }
-        
-        totchoices <- nrow(choices)
-        for(i in 1:totchoices){
-          
-          progress1$set(message = str_c(i,"/",totchoices,"のレポートを作成中"), value = i*(1/totchoices))
-          adept1 <- choices$dept1[i]
-          
-          if(level == "dept1_dept2"){
-            adept2 <- choices$dept2[i]  
-          }else{
-            adept2 <- NULL
-          }
-          
-          progress2 <- shiny::Progress$new()
-          progress2$set(message = "Excelレポートを作成中", value = 0)
-          
-          res <- gen_analysis_results(data_now = processed_data_now(),
-                                      data_past = processed_data_past(),
-                                      level = level,
-                                      targetdept1 = adept1,
-                                      targetdept2 = adept2,
-                                      gyousyu = gyousyu,
-                                      long_or_cross = long_or_cross,
-                                      bench_gyousyu = bench_gyousyu,
-                                      analysis_displaytype = analysis_displaytype,
-                                      numlimit = input$numlimit,
-                                      show_numlimit_modal = FALSE)
-          
-          report_params <- list(
-            dept1 = adept1,
-            dept2 = adept2,
-            skr_gyousyu = gyousyu,
-            skr_longcross = long_or_cross,
-            bench_gyousyu = bench_gyousyu,
-            display_type = analysis_displaytype,
-            rendering_data = res
-          )
-          
-          invalid_pattern <- "[<>:\"/\\\\|?*]|[\\x00-\\x1F]"
-          if(is.null(res)){
-            #処理結果がNULLなので、レポートは出さない
-            filename_xlsx <- if_else(is.null(adept2), str_c(adept1,"(人数不十分_空ファイル).xlsx"), str_c(adept1,"_",adept2,".xlsx"))
-            output_path <- file.path(temp_report_dir, str_remove_all(filename_xlsx, invalid_pattern))
-            wb <- openxlsx2::wb_workbook(creator = "FactoryHealthCo",title = "SC分析レポート")  
-            wb$save(output_path)
-            rm(wb)
-          }else{
-            filename_xlsx <- if_else(is.null(adept2), str_c(adept1,".xlsx"), str_c(adept1,"_",adept2,".xlsx"))          
-            output_path <- file.path(temp_report_dir, str_remove_all(filename_xlsx, invalid_pattern))  
-            make_excel_report(report_params, output_path, progress2)
-          }
-          
-          progress2$close()
-        }
-     
-        
-        # 元の作業ディレクトリを記憶
-        owd <- getwd()
-        # 関数を抜け出すときに必ず元のディレクトリに戻るように設定
-        on.exit(setwd(owd), add = TRUE) # add = TRUEで既存のon.exit(progress$close())を上書きしない
-        
-        # 専用の一時フォルダに作業ディレクトリを移動
-        setwd(temp_report_dir)
-        
-        # フォルダ内にあるすべてのファイルを取得
-        files_to_zip <- list.files(full.name=TRUE)
-        
-        # zipコマンドを実行
-        # zipfileにはShinyから渡された絶対パス`file`を指定
-        # filesにはカレントディレクトリのファイルリストを指定
-        zip::zipr(zipfile = file, files = files_to_zip)
-      }
-    )
-  })
+    #非同期処理などをしないと固まるので、通常版では解放していません。
+    #利用する場合はUIのコメントアウトをはずせば利用できます。
+  #   output$download_all_report_button <- downloadHandler(
+  #     filename = function(){
+  #       if(input$level_select=="dept1"){
+  #         filename <- "大分類.zip"
+  #       }else if(input$level_select == "dept1_dept2"){
+  #         filename <- "大分類-中分類.zip"
+  #       }
+  #       
+  #       return(filename)
+  #     },
+  #     content = function(file){
+  #       temp_report_dir <- file.path(tempdir(), paste0("reports_", as.integer(Sys.time())))
+  #       dir.create(temp_report_dir)
+  # 
+  #       progress1 <- shiny::Progress$new()
+  #       progress1$set(message = "全部署レポートを作成中", value = 0)
+  #       on.exit(progress1$close())
+  #       
+  #       
+  #       gyousyu <- input$gyousyu
+  #       long_or_cross <- input$long_or_cross
+  #       bench_gyousyu <- input$bench_gyousyu
+  #       analysis_displaytype <- input$analysis_displaytype
+  #       
+  #       #choiceを再度取得
+  #       data <- processed_data_now()
+  #       level <- input$level_select
+  #     
+  #       dept1_choice <- unique(data$dept1) |> sort()
+  #       dept2_choice <- data |> 
+  #         filter(dept1 == input$target_dept1) |> 
+  #         pull(dept2) |> 
+  #         unique() |> 
+  #         sort()
+  #       
+  #       if(level == "dept1_dept2"){
+  #         #10人以上だけ出力する
+  #         choices <- data |> count(dept1, dept2) |> filter(n >= 10)
+  #       }else if(level == "dept1"){
+  #         choices <- data |> count(dept1) |> filter(n >= 10)
+  #       }
+  #       
+  #       totchoices <- nrow(choices)
+  #       for(i in 1:totchoices){
+  #         
+  #         progress1$set(message = str_c(i,"/",totchoices,"のレポートを作成中"), value = i*(1/totchoices))
+  #         adept1 <- choices$dept1[i]
+  #         
+  #         if(level == "dept1_dept2"){
+  #           adept2 <- choices$dept2[i]  
+  #         }else{
+  #           adept2 <- NULL
+  #         }
+  #         
+  #         progress2 <- shiny::Progress$new()
+  #         progress2$set(message = "Excelレポートを作成中", value = 0)
+  #         
+  #         res <- gen_analysis_results(data_now = processed_data_now(),
+  #                                     data_past = processed_data_past(),
+  #                                     level = level,
+  #                                     targetdept1 = adept1,
+  #                                     targetdept2 = adept2,
+  #                                     gyousyu = gyousyu,
+  #                                     long_or_cross = long_or_cross,
+  #                                     bench_gyousyu = bench_gyousyu,
+  #                                     analysis_displaytype = analysis_displaytype,
+  #                                     numlimit = input$numlimit,
+  #                                     show_numlimit_modal = FALSE)
+  #         
+  #         report_params <- list(
+  #           dept1 = adept1,
+  #           dept2 = adept2,
+  #           skr_gyousyu = gyousyu,
+  #           skr_longcross = long_or_cross,
+  #           bench_gyousyu = bench_gyousyu,
+  #           display_type = analysis_displaytype,
+  #           rendering_data = res
+  #         )
+  #         
+  #         invalid_pattern <- "[<>:\"/\\\\|?*]|[\\x00-\\x1F]"
+  #         if(is.null(res)){
+  #           #処理結果がNULLなので、レポートは出さない
+  #           filename_xlsx <- if_else(is.null(adept2), str_c(adept1,"(人数不十分_空ファイル).xlsx"), str_c(adept1,"_",adept2,".xlsx"))
+  #           output_path <- file.path(temp_report_dir, str_remove_all(filename_xlsx, invalid_pattern))
+  #           wb <- openxlsx2::wb_workbook(creator = "FactoryHealthCo",title = "SC分析レポート")  
+  #           wb$save(output_path)
+  #           rm(wb)
+  #         }else{
+  #           filename_xlsx <- if_else(is.null(adept2), str_c(adept1,".xlsx"), str_c(adept1,"_",adept2,".xlsx"))          
+  #           output_path <- file.path(temp_report_dir, str_remove_all(filename_xlsx, invalid_pattern))  
+  #           make_excel_report(report_params, output_path, progress2)
+  #         }
+  #         
+  #         progress2$close()
+  #       }
+  #    
+  #       
+  #       # 元の作業ディレクトリを記憶
+  #       owd <- getwd()
+  #       # 関数を抜け出すときに必ず元のディレクトリに戻るように設定
+  #       on.exit(setwd(owd), add = TRUE) # add = TRUEで既存のon.exit(progress$close())を上書きしない
+  #       
+  #       # 専用の一時フォルダに作業ディレクトリを移動
+  #       setwd(temp_report_dir)
+  #       
+  #       # フォルダ内にあるすべてのファイルを取得
+  #       files_to_zip <- list.files(full.name=TRUE)
+  #       
+  #       # zipコマンドを実行
+  #       # zipfileにはShinyから渡された絶対パス`file`を指定
+  #       # filesにはカレントディレクトリのファイルリストを指定
+  #       zip::zipr(zipfile = file, files = files_to_zip)
+  #     }
+  #   )
+   })
 }
 

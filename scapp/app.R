@@ -1,5 +1,6 @@
 # app.R
 # global.Rでライブラリやソースは読み込み済み
+source("global.R")
 
 # --- アプリケーションUIの定義 ---
 ui <- dashboardPage(
@@ -28,7 +29,10 @@ ui <- dashboardPage(
       tabItem(tabName = "welcome",
               h2("ようこそ"),
               p("このツールは、ストレスチェックデータの集団分析を行います。"),
-              p("左のメニューから「データ設定」を選び、分析したいデータを準備してください。")
+              p("左のメニューから「データ設定」を選び、分析したいデータを準備してください。"),
+              p("オンラインデモのための仮想データは、"),
+              tags$a(href="https://drive.google.com/drive/folders/1j7t7owZTC-yUByONbgI8Vder67vvWxIB?usp=sharing", "こちらのリンク"),
+              p("からダウンロードできます。")
       ),
       tabItem(tabName = "current_year_setup",
               h2("今年度データ設定ウィザード"),
@@ -66,19 +70,19 @@ server <- function(input, output, session) {
 
   # --- UIの動的制御 ---
   # 今年度のデータが設定されるまで分析タブを無効化する
-  observe({
-    # is_setup_completeはreactiveなので()をつけて呼び出す
-    if (isTRUE(current_year_data$is_setup_complete())) {
-      # menuItemのdata-valueは自動でtabNameと同じになる
-      shinyjs::enable(selector = "a[data-value='analysis_table']")
-      shinyjs::enable(selector = "a[data-value='dept_comparison']")
-      shinyjs::enable(selector = "a[data-value='regression_analysis']")
-    } else {
-      shinyjs::disable(selector = "a[data-value='analysis_table']")
-      shinyjs::disable(selector = "a[data-value='dept_comparison']")
-      shinyjs::disable(selector = "a[data-value='regression_analysis']")
-    }
-  })
+  # observe({
+  #   # is_setup_completeはreactiveなので()をつけて呼び出す
+  #   if (isTRUE(current_year_data$is_setup_complete())) {
+  #     # menuItemのdata-valueは自動でtabNameと同じになる
+  #     shinyjs::enable(selector = "a[data-value='analysis_table']")
+  #     shinyjs::enable(selector = "a[data-value='dept_comparison']")
+  #     shinyjs::enable(selector = "a[data-value='regression_analysis']")
+  #   } else {
+  #     shinyjs::disable(selector = "a[data-value='analysis_table']")
+  #     shinyjs::disable(selector = "a[data-value='dept_comparison']")
+  #     shinyjs::disable(selector = "a[data-value='regression_analysis']")
+  #   }
+  # })
   
   # 表描画モジュールの呼び出し
   analysis_table_module_server(

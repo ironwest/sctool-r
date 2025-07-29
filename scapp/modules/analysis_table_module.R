@@ -87,15 +87,6 @@ analysis_table_module_server <- function(id,
     # --- UIの動的更新 ---
     # データの有無に応じてUI要素（ボタン、選択肢）を更新する
     observe({
-      # 1. 今年度データがない場合は、ボタンを無効化し、メッセージを表示
-      if (!has_current_data()) {
-        updateActionButton(session, "update_table_button",
-                           label = "今年度データ未読込", icon = icon("exclamation-circle"))
-        # shinyjs::disable("update_table_button") などを使うとより明確に無効化できる
-      } else {
-        updateActionButton(session, "update_table_button",
-                           label = "表を更新", icon = icon("sync"))
-      }
       
       # 2. 過去データの有無で表示モードの選択肢を切り替え
       if (has_previous_data() && has_current_data()) {
@@ -221,9 +212,9 @@ analysis_table_module_server <- function(id,
     # --- テーブルのレンダリング ---
     output$summary_table <- renderReactable({
       # validate() でユーザーに分かりやすいフィードバックを提供
-      validate(
-        need(has_current_data(), "今年度のストレスチェックデータを読み込んでください。")
-      )
+      # validate(
+      #   need(has_current_data(), "今年度のストレスチェックデータを読み込んでください。")
+      # )
       
       # ボタンが押されると、display_data_and_params() が実行され、結果がここに渡される
       calc_results <- display_data_and_params()
@@ -237,9 +228,9 @@ analysis_table_module_server <- function(id,
       params <- calc_results$params
       group_vars <- calc_results$group_vars
       
-      validate(
-        need(nrow(hyou) > 0, "計算結果がありません。集計単位や設定を確認してください。")
-      )
+      # validate(
+      #   need(nrow(hyou) > 0, "計算結果がありません。集計単位や設定を確認してください。")
+      # )
       
       # 表の設定と整形 (inputを直接参照せず、受け取ったパラメータを使用)
       if (params$display_mode == "diff") {
