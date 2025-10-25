@@ -1,5 +1,3 @@
-# TODO: 集団解析で、10人未満部署を一つにまとめる方法
-
 # モジュールUI-------------------------
 dept_comparison_module_ui <- function(id) {
   ns <- NS(id)
@@ -59,7 +57,9 @@ dept_comparison_module_ui <- function(id) {
                  selectInput(ns("gyousyu"), "総合健康リスク計算の業種の選択",
                              choices = skrisk_gyousyu),
                  selectInput(ns("long_or_cross"), "総合健康リスク計算の種類",
-                             choices = c("縦断(推奨)" = "long","横断" = "cross"))
+                             choices = c("縦断(推奨)" = "long","横断" = "cross")),
+                 h4("分析最低人数の設定"),
+                 numericInput(ns("numlimit"),label = "集団分析の最小人数",min = 5, value=10),
           ),
           column(width = 4, 
                  h4("ベンチマーク職種の設定"),
@@ -98,11 +98,11 @@ dept_comparison_module_ui <- function(id) {
           )
         ),
         hr(),
-        p("以下のボタンから、分析結果をまとめたExcelのレポートとしてダウンロードできます。（20－30秒レポート作成にかかります）"),
+        p("以下のボタンから、分析結果をまとめたExcelのレポートとしてダウンロードできます。（20－30秒レポート作成にかかります）。開始すると止められません"),
         downloadButton(ns("download_report_button"), "Excelレポートをダウンロード", icon = icon("file-excel")),
-        hr(),
-        p("以下のボタンで、全部署のレポートを作成します実行時間が長くなる場合があるため、注意してください。"),
-        downloadButton(ns("download_all_report_button"), "全部署のExcelレポートをダウンロード", icon = icon("folder"))
+        # hr(),
+        # p("以下のボタンで、全部署のレポートを作成します実行時間が長くなる場合があるため、注意してください。"),
+        # downloadButton(ns("download_all_report_button"), "全部署のExcelレポートをダウンロード", icon = icon("folder"))
       )
     )
   )
@@ -161,7 +161,17 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
     })
     
     # --- 分析実行 (変更なし) ---
-    gen_analysis_results <- function(data_now, data_past,level, targetdept1, targetdept2, gyousyu, long_or_cross,bench_gyousyu,analysis_displaytype){
+    gen_analysis_results <- function(data_now, 
+                                     data_past,
+                                     level, 
+                                     targetdept1, 
+                                     targetdept2, 
+                                     gyousyu, 
+                                     long_or_cross,
+                                     bench_gyousyu,
+                                     analysis_displaytype,
+                                     numlimit, 
+                                     show_numlimit_modal=FALSE){
       
       #datanowの処理--------------------
       
@@ -172,6 +182,8 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
         data_now <- data_now |> mutate(grp = str_c(dept1,"-",dept2))
         target_grp_name <- str_c(targetdept1,"-",targetdept2)
       }
+      
+      
       
       hyou_now <- calculate_hensati_hyou(
         current_data = data_now, 
@@ -184,58 +196,25 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
         target_longorcross = long_or_cross,
         precise=TRUE
       )
+  
+      analysisn <- hyou_now |> 
+        filter(grp == target_grp_name) |> 
+        select(grp, n = `受検人数`, missn = `不完全回答人数`) |> 
+        mutate(analysisn = n - missn) |> 
+        pull(analysisn)
       
-      hyou_oa_now <- data_now |> 
-        mutate(grp = "全体") |> 
-        calculate_hensati_hyou(
-          hensati_data = hensati_data, 
-          target_sheet = "全体", #全体以外は現時点ではなし 
-          group_vars = "grp", 
-          nbjsq = nbjsq, 
-          nbjsqlabs = nbjsqlabs,
-          target_gyousyu = gyousyu,
-          target_longorcross = long_or_cross,
-          precise=TRUE
-        )
-      
-      hyou_oa_now  <- hyou_oa_now  |> 
-        mutate(`時期` = "今回") |> 
-        mutate(`対象` = grp) |> 
-        mutate(`高ストレス者割合(%)` = scales::percent(`高ストレス者割合`, accuracy=0.1))
-      
-      hyou_now     <- hyou_now     |> 
-        mutate(`時期` = "今回") |> 
-        mutate(`対象` = grp) |> 
-        mutate(`高ストレス者割合(%)` = scales::percent(`高ストレス者割合`, accuracy=0.1)) |> 
-        mutate(color_this = grp == target_grp_name)
-      
-      #datapastの処理--------------------------
-      if(is.null(data_past)){
-        data_past <- data_now |> filter(FALSE)
-        hyou_oa_past <- hyou_oa_now |> filter(FALSE)
-        hyou_past <- hyou_now |> filter(FALSE)
-      }else{
-        if(level == "dept1"){
-          data_past <- data_past |> mutate(grp = dept1)
-          target_grp_name <- targetdept1
-        }else if(level == "dept1_dept2"){
-          data_past <- data_past |> mutate(grp = str_c(dept1,"-",dept2))
-          target_grp_name <- str_c(targetdept1,"-",targetdept2)
+      #分析人数が規定の数かどうかをチェック
+      print(str_c("分析対象人数：",analysisn))
+      if(analysisn < numlimit){
+        
+        if(show_numlimit_modal){
+          showModal(modalDialog("分析対象者が",numlimit,"人未満のため、分析を中止します。",
+                                footer = modalButton("OK")))  
         }
+        ghres <- NULL
         
-        hyou_past <- calculate_hensati_hyou(
-          current_data = data_past, 
-          hensati_data = hensati_data, 
-          target_sheet = "全体", #全体以外は現時点ではなし 
-          group_vars = "grp", 
-          nbjsq = nbjsq, 
-          nbjsqlabs = nbjsqlabs,
-          target_gyousyu = gyousyu,
-          target_longorcross = long_or_cross,
-          precise=TRUE
-        )
-        
-        hyou_oa_past <- data_past |> 
+      }else{
+        hyou_oa_now <- data_now |> 
           mutate(grp = "全体") |> 
           calculate_hensati_hyou(
             hensati_data = hensati_data, 
@@ -248,44 +227,95 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
             precise=TRUE
           )
         
-        hyou_oa_past <- hyou_oa_past |> 
-          mutate(`時期` = "前回") |> 
+        hyou_oa_now  <- hyou_oa_now  |> 
+          mutate(`時期` = "今回") |> 
           mutate(`対象` = grp) |> 
           mutate(`高ストレス者割合(%)` = scales::percent(`高ストレス者割合`, accuracy=0.1))
         
-        hyou_past    <- hyou_past    |> 
-          mutate(`時期` = "前回") |> 
+        hyou_now     <- hyou_now     |> 
+          mutate(`時期` = "今回") |> 
           mutate(`対象` = grp) |> 
           mutate(`高ストレス者割合(%)` = scales::percent(`高ストレス者割合`, accuracy=0.1)) |> 
           mutate(color_this = grp == target_grp_name)
-      }
-       
-      #グラフとテーブルを設定データをもとに作成する------------------------------------
-      ghres <- tibble()
-      for(i in 1:length(ghsetting)){
         
-        asetting <- enframe(ghsetting)$value[[i]]
-        set_type <- asetting$type
-        
-        if(set_type == "ghbase"){
-          ares <- make_ghbase_result(hyou_oa_now, hyou_now,hyou_oa_past, hyou_past, target_grp_name, asetting)   
-        }else if(set_type == "hanteizu"){
-          tgtsyokusyu <- gyousyu
-          ares <- make_hanteizu_result(hyou_oa_now, hyou_now,hyou_oa_past, hyou_past, asetting, target_grp_name,risk_calc_setting, tgtsyokusyu)
-        }else if(set_type == "gh"){
-          tgtgyousyu <- bench_gyousyu
-          ares <- make_gh_result(hyou_oa_now, hyou_now,hyou_oa_past, hyou_past, hensati_data, tgtgyousyu, target_grp_name, asetting, mode="gh", display_type = analysis_displaytype)
-          qqres <- make_qq_result(data_now, data_past, target_grp_name, asetting, nbjsq, nbjsq_answerlabs)
+        #datapastの処理--------------------------
+        if(is.null(data_past)){
+          data_past <- data_now |> filter(FALSE)
+          hyou_oa_past <- hyou_oa_now |> filter(FALSE)
+          hyou_past <- hyou_now |> filter(FALSE)
+        }else{
+          if(level == "dept1"){
+            data_past <- data_past |> mutate(grp = dept1)
+            target_grp_name <- targetdept1
+          }else if(level == "dept1_dept2"){
+            data_past <- data_past |> mutate(grp = str_c(dept1,"-",dept2))
+            target_grp_name <- str_c(targetdept1,"-",targetdept2)
+          }
           
-          ares <- ares |> left_join(qqres, by=c("bunrui","name"))
-        }else if(set_type == "h"){
-          ares <- make_gh_result(hyou_oa_now, hyou_now,hyou_oa_past, hyou_past, hensati_data, tgtgyousyu, target_grp_name, asetting, mode="h", display_type = analysis_displaytype)
-          qqres <- make_qq_result(data_now, data_past, target_grp_name, asetting, nbjsq, nbjsq_answerlabs)
+          hyou_past <- calculate_hensati_hyou(
+            current_data = data_past, 
+            hensati_data = hensati_data, 
+            target_sheet = "全体", #全体以外は現時点ではなし 
+            group_vars = "grp", 
+            nbjsq = nbjsq, 
+            nbjsqlabs = nbjsqlabs,
+            target_gyousyu = gyousyu,
+            target_longorcross = long_or_cross,
+            precise=TRUE
+          )
           
-          ares <- ares |> left_join(qqres, by=c("bunrui","name"))
+          hyou_oa_past <- data_past |> 
+            mutate(grp = "全体") |> 
+            calculate_hensati_hyou(
+              hensati_data = hensati_data, 
+              target_sheet = "全体", #全体以外は現時点ではなし 
+              group_vars = "grp", 
+              nbjsq = nbjsq, 
+              nbjsqlabs = nbjsqlabs,
+              target_gyousyu = gyousyu,
+              target_longorcross = long_or_cross,
+              precise=TRUE
+            )
+          
+          hyou_oa_past <- hyou_oa_past |> 
+            mutate(`時期` = "前回") |> 
+            mutate(`対象` = grp) |> 
+            mutate(`高ストレス者割合(%)` = scales::percent(`高ストレス者割合`, accuracy=0.1))
+          
+          hyou_past    <- hyou_past    |> 
+            mutate(`時期` = "前回") |> 
+            mutate(`対象` = grp) |> 
+            mutate(`高ストレス者割合(%)` = scales::percent(`高ストレス者割合`, accuracy=0.1)) |> 
+            mutate(color_this = grp == target_grp_name)
         }
         
-        ghres <- bind_rows(ghres, ares)
+        #グラフとテーブルを設定データをもとに作成する------------------------------------
+        ghres <- tibble()
+        for(i in 1:length(ghsetting)){
+          
+          asetting <- enframe(ghsetting)$value[[i]]
+          set_type <- asetting$type
+          
+          if(set_type == "ghbase"){
+            ares <- make_ghbase_result(hyou_oa_now, hyou_now,hyou_oa_past, hyou_past, target_grp_name, asetting)   
+          }else if(set_type == "hanteizu"){
+            tgtsyokusyu <- gyousyu
+            ares <- make_hanteizu_result(hyou_oa_now, hyou_now,hyou_oa_past, hyou_past, asetting, target_grp_name,risk_calc_setting, tgtsyokusyu)
+          }else if(set_type == "gh"){
+            tgtgyousyu <- bench_gyousyu
+            ares <- make_gh_result(hyou_oa_now, hyou_now,hyou_oa_past, hyou_past, hensati_data, tgtgyousyu, target_grp_name, asetting, mode="gh", display_type = analysis_displaytype)
+            qqres <- make_qq_result(data_now, data_past, target_grp_name, asetting, nbjsq, nbjsq_answerlabs)
+            
+            ares <- ares |> left_join(qqres, by=c("bunrui","name"))
+          }else if(set_type == "h"){
+            ares <- make_gh_result(hyou_oa_now, hyou_now,hyou_oa_past, hyou_past, hensati_data, tgtgyousyu, target_grp_name, asetting, mode="h", display_type = analysis_displaytype)
+            qqres <- make_qq_result(data_now, data_past, target_grp_name, asetting, nbjsq, nbjsq_answerlabs)
+            
+            ares <- ares |> left_join(qqres, by=c("bunrui","name"))
+          }
+          
+          ghres <- bind_rows(ghres, ares)
+        }
       }
       
       return(ghres)
@@ -294,17 +324,21 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
     analysis_results <- eventReactive(input$run_comparison, {
       req(processed_data_now(), input$target_dept1)
       
-      res <- gen_analysis_results(data_now = processed_data_now(),
-                           data_past = processed_data_past(),
-                           level = input$level_select,
-                           targetdept1 = input$target_dept1,
-                           targetdept2 = input$target_dept2,
-                           gyousyu = input$gyousyu,
-                           long_or_cross = input$long_or_cross,
-                           bench_gyousyu = input$bench_gyousyu,
-                           analysis_displaytype = input$analysis_displaytype)
       
-      
+      tryCatch({
+        res <- gen_analysis_results(data_now = processed_data_now(),
+                                    data_past = processed_data_past(),
+                                    level = input$level_select,
+                                    targetdept1 = input$target_dept1,
+                                    targetdept2 = input$target_dept2,
+                                    gyousyu = input$gyousyu,
+                                    long_or_cross = input$long_or_cross,
+                                    bench_gyousyu = input$bench_gyousyu,
+                                    analysis_displaytype = input$analysis_displaytype,
+                                    numlimit = input$numlimit,
+                                    show_numlimit_modal = TRUE)
+      }, error = function(e) {res <- tibble() })  
+    
       
       return(res)
     })
@@ -442,118 +476,127 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
           rendering_data = analysis_results()
         )
         
-        #TODO: Add info panel for rendering report
         make_excel_report(report_params, file, progress)
         
       }
     )
     
-    output$download_all_report_button <- downloadHandler(
-      filename = function(){
-        if(input$level_select=="dept1"){
-          filename <- "大分類.zip"
-        }else if(input$level_select == "dept1_dept2"){
-          filename <- "大分類-中分類.zip"
-        }
-        
-        return(filename)
-      },
-      content = function(file){
-        temp_report_dir <- file.path(tempdir(), paste0("reports_", as.integer(Sys.time())))
-        dir.create(temp_report_dir)
-
-        progress1 <- shiny::Progress$new()
-        progress1$set(message = "全部署レポートを作成中", value = 0)
-        on.exit(progress1$close())
-        
-        #選択されているものを固定する(念のため
-        gyousyu <- input$gyousyu
-        long_or_cross <- input$long_or_cross
-        bench_gyousyu <- input$bench_gyousyu
-        analysis_displaytype <- input$analysis_displaytype
-        
-        #choiceを再度取得
-        data <- processed_data_now()
-        level <- input$level_select
-      
-        dept1_choice <- unique(data$dept1) |> sort()
-        dept2_choice <- data |> 
-          filter(dept1 == input$target_dept1) |> 
-          pull(dept2) |> 
-          unique() |> 
-          sort()
-        
-        if(level == "dept1_dept2"){
-          #10人以上だけ出力する
-          choices <- data |> count(dept1, dept2) |> filter(n >= 10)
-        }else if(level == "dept1"){
-          choices <- data |> count(dept1) |> filter(n >= 10)
-        }
-        
-        totchoices <- nrow(choices)
-        for(i in 1:totchoices){
-          
-          progress1$set(message = str_c(i,"/",totchoices,"のレポートを作成中"), value = i*(1/totchoices))
-          adept1 <- choices$dept1[i]
-          
-          if(level == "dept1_dept2"){
-            adept2 <- choices$dept2[i]  
-          }else{
-            adept2 <- NULL
-          }
-          
-          progress2 <- shiny::Progress$new()
-          progress2$set(message = "Excelレポートを作成中", value = 0)
-          
-          res <- gen_analysis_results(data_now = processed_data_now(),
-                                      data_past = processed_data_past(),
-                                      level = level,
-                                      targetdept1 = adept1,
-                                      targetdept2 = adept2,
-                                      gyousyu = gyousyu,
-                                      long_or_cross = long_or_cross,
-                                      bench_gyousyu = bench_gyousyu,
-                                      analysis_displaytype = analysis_displaytype)
-          
-          report_params <- list(
-            dept1 = adept1,
-            dept2 = adept2,
-            skr_gyousyu = gyousyu,
-            skr_longcross = long_or_cross,
-            bench_gyousyu = bench_gyousyu,
-            display_type = analysis_displaytype,
-            rendering_data = res
-          )
-          
-          filename_xlsx <- str_c(adept1,"_",adept2,".xlsx")
-          invalid_pattern <- "[<>:\"/\\\\|?*]|[\\x00-\\x1F]"
-          output_path <- file.path(temp_report_dir, str_remove_all(filename_xlsx, invalid_pattern))
-          
-          
-          #TODO: Add info panel for rendering report
-          make_excel_report(report_params, output_path, progress2)
-          
-          progress2$close()
-        }
-     
-        
-        # 元の作業ディレクトリを記憶
-        owd <- getwd()
-        # 関数を抜け出すときに必ず元のディレクトリに戻るように設定
-        on.exit(setwd(owd), add = TRUE) # add = TRUEで既存のon.exit(progress$close())を上書きしない
-        
-        # 専用の一時フォルダに作業ディレクトリを移動
-        setwd(temp_report_dir)
-        
-        # フォルダ内にあるすべてのファイルを取得
-        files_to_zip <- list.files(full.name=TRUE)
-        
-        # zipコマンドを実行
-        # zipfileにはShinyから渡された絶対パス`file`を指定
-        # filesにはカレントディレクトリのファイルリストを指定
-        zip::zipr(zipfile = file, files = files_to_zip)
-      }
-    )
-  })
+    #非同期処理などをしないと固まるので、通常版では解放していません。
+    #利用する場合はUIのコメントアウトをはずせば利用できます。
+  #   output$download_all_report_button <- downloadHandler(
+  #     filename = function(){
+  #       if(input$level_select=="dept1"){
+  #         filename <- "大分類.zip"
+  #       }else if(input$level_select == "dept1_dept2"){
+  #         filename <- "大分類-中分類.zip"
+  #       }
+  #       
+  #       return(filename)
+  #     },
+  #     content = function(file){
+  #       temp_report_dir <- file.path(tempdir(), paste0("reports_", as.integer(Sys.time())))
+  #       dir.create(temp_report_dir)
+  # 
+  #       progress1 <- shiny::Progress$new()
+  #       progress1$set(message = "全部署レポートを作成中", value = 0)
+  #       on.exit(progress1$close())
+  #       
+  #       
+  #       gyousyu <- input$gyousyu
+  #       long_or_cross <- input$long_or_cross
+  #       bench_gyousyu <- input$bench_gyousyu
+  #       analysis_displaytype <- input$analysis_displaytype
+  #       
+  #       #choiceを再度取得
+  #       data <- processed_data_now()
+  #       level <- input$level_select
+  #     
+  #       dept1_choice <- unique(data$dept1) |> sort()
+  #       dept2_choice <- data |> 
+  #         filter(dept1 == input$target_dept1) |> 
+  #         pull(dept2) |> 
+  #         unique() |> 
+  #         sort()
+  #       
+  #       if(level == "dept1_dept2"){
+  #         #10人以上だけ出力する
+  #         choices <- data |> count(dept1, dept2) |> filter(n >= 10)
+  #       }else if(level == "dept1"){
+  #         choices <- data |> count(dept1) |> filter(n >= 10)
+  #       }
+  #       
+  #       totchoices <- nrow(choices)
+  #       for(i in 1:totchoices){
+  #         
+  #         progress1$set(message = str_c(i,"/",totchoices,"のレポートを作成中"), value = i*(1/totchoices))
+  #         adept1 <- choices$dept1[i]
+  #         
+  #         if(level == "dept1_dept2"){
+  #           adept2 <- choices$dept2[i]  
+  #         }else{
+  #           adept2 <- NULL
+  #         }
+  #         
+  #         progress2 <- shiny::Progress$new()
+  #         progress2$set(message = "Excelレポートを作成中", value = 0)
+  #         
+  #         res <- gen_analysis_results(data_now = processed_data_now(),
+  #                                     data_past = processed_data_past(),
+  #                                     level = level,
+  #                                     targetdept1 = adept1,
+  #                                     targetdept2 = adept2,
+  #                                     gyousyu = gyousyu,
+  #                                     long_or_cross = long_or_cross,
+  #                                     bench_gyousyu = bench_gyousyu,
+  #                                     analysis_displaytype = analysis_displaytype,
+  #                                     numlimit = input$numlimit,
+  #                                     show_numlimit_modal = FALSE)
+  #         
+  #         report_params <- list(
+  #           dept1 = adept1,
+  #           dept2 = adept2,
+  #           skr_gyousyu = gyousyu,
+  #           skr_longcross = long_or_cross,
+  #           bench_gyousyu = bench_gyousyu,
+  #           display_type = analysis_displaytype,
+  #           rendering_data = res
+  #         )
+  #         
+  #         invalid_pattern <- "[<>:\"/\\\\|?*]|[\\x00-\\x1F]"
+  #         if(is.null(res)){
+  #           #処理結果がNULLなので、レポートは出さない
+  #           filename_xlsx <- if_else(is.null(adept2), str_c(adept1,"(人数不十分_空ファイル).xlsx"), str_c(adept1,"_",adept2,".xlsx"))
+  #           output_path <- file.path(temp_report_dir, str_remove_all(filename_xlsx, invalid_pattern))
+  #           wb <- openxlsx2::wb_workbook(creator = "FactoryHealthCo",title = "SC分析レポート")  
+  #           wb$save(output_path)
+  #           rm(wb)
+  #         }else{
+  #           filename_xlsx <- if_else(is.null(adept2), str_c(adept1,".xlsx"), str_c(adept1,"_",adept2,".xlsx"))          
+  #           output_path <- file.path(temp_report_dir, str_remove_all(filename_xlsx, invalid_pattern))  
+  #           make_excel_report(report_params, output_path, progress2)
+  #         }
+  #         
+  #         progress2$close()
+  #       }
+  #    
+  #       
+  #       # 元の作業ディレクトリを記憶
+  #       owd <- getwd()
+  #       # 関数を抜け出すときに必ず元のディレクトリに戻るように設定
+  #       on.exit(setwd(owd), add = TRUE) # add = TRUEで既存のon.exit(progress$close())を上書きしない
+  #       
+  #       # 専用の一時フォルダに作業ディレクトリを移動
+  #       setwd(temp_report_dir)
+  #       
+  #       # フォルダ内にあるすべてのファイルを取得
+  #       files_to_zip <- list.files(full.name=TRUE)
+  #       
+  #       # zipコマンドを実行
+  #       # zipfileにはShinyから渡された絶対パス`file`を指定
+  #       # filesにはカレントディレクトリのファイルリストを指定
+  #       zip::zipr(zipfile = file, files = files_to_zip)
+  #     }
+  #   )
+   })
 }
 

@@ -1,7 +1,7 @@
 # 表描画モジュールUI----------------------
 analysis_table_module_ui <- function(id) {
   ns <- NS(id) # 名前空間を取得
-  
+
   skrisk_gyousyu <- c(
     "全産業",
     "医療・福祉",
@@ -15,7 +15,7 @@ analysis_table_module_ui <- function(id) {
     "情報通信業",
     "製造業"
   )
-  
+
   tagList(
     fluidRow(
       box(
@@ -35,7 +35,7 @@ analysis_table_module_ui <- function(id) {
           column(width = 4,
                  selectInput(ns("display_mode"), "表示モードの選択",
                              choices = c("偏差値(今回)" = "hensati",
-                                         "前回との差" = "diff",
+                                         #"前回との差" = "diff",
                                          "偏差値(前回)" = "hensati_prev")),
                  numericInput(ns("limitnumber"),"分析対象の最低人数を設定する",value=10, min=5)
           ),
@@ -75,18 +75,21 @@ analysis_table_module_server <- function(id,
   
   moduleServer(id, function(input, output, session) {
     
-    rv <- reactiveValues(
-      no_previous_data = FALSE,
-      no_current_data = FALSE
-    )
-    
+    # --- 静的データの読み込み ---
+    # アプリ起動時に一度だけ読み込む
     hensati_data <- read_csv("modules/table11.csv")
     nbjsq <- read_csv("modules/nbjsq_question_text.csv")
     nbjsqlabs <- read_csv("modules/nbjsq_label_hensati.csv")
     
     ns <- session$ns
     
-    #過去データがない場合にdiffや過去の表示はさせない
+    # --- リアクティブ: データの有無をチェック ---
+    # データの有無をリアクティブな値として保持することで、コードの可読性を高める
+    has_current_data <- reactive({ !is.null(processed_current_year_data()) })
+    has_previous_data <- reactive({ !is.null(processed_previous_year_data()) })
+    
+    # --- UIの動的更新 ---
+    # データの有無に応じてUI要素（ボタン、選択肢）を更新する
     observe({
       rv$no_previous_data <- is.null(processed_previous_year_data())
       rv$no_current_data <- is.null(processed_current_year_data())
@@ -163,20 +166,19 @@ analysis_table_module_server <- function(id,
           current_data = current_data, 
           hensati_data = hensati_data, 
           target_sheet = target_sheet, 
-          group_vars = group_vars, 
+          group_vars = group_vars,
           nbjsq = nbjsq, 
           nbjsqlabs = nbjsqlabs,
           target_gyousyu = gyousyu,
           target_longorcross = long_or_cross
         )
         
-      }else if(display_mode == "diff"){
-        #年度の比較
+      } else { # "diff" の場合
         hyou_now <- calculate_hensati_hyou(
-          current_data = datanow, 
-          hensati_data = hensati_data, 
+          current_data = current_data, 
+          hensati_data = hensati_data,
           target_sheet = target_sheet, 
-          group_vars = group_vars, 
+          group_vars = group_vars,
           nbjsq = nbjsq, 
           nbjsqlabs = nbjsqlabs,
           target_gyousyu = gyousyu,
@@ -184,23 +186,23 @@ analysis_table_module_server <- function(id,
         )
         
         hyou_past <- calculate_hensati_hyou(
-          current_data = datapast, 
-          hensati_data = hensati_data, 
+          current_data = previous_data, 
+          hensati_data = hensati_data,
           target_sheet = target_sheet, 
-          group_vars = group_vars, 
+          group_vars = group_vars,
           nbjsq = nbjsq, 
           nbjsqlabs = nbjsqlabs,
           target_gyousyu = gyousyu,
           target_longorcross = long_or_cross
         )
         
-        hyou_now <- hyou_now |> 
-          pivot_longer(cols = !group_vars) |> 
-          rename(values_now = value)
+        #今回の人数情報を別の変数に保持しておく
+        n_data_now <- hyou_now |> 
+          select(all_of(group_vars), `受検人数`, `不完全回答人数`)
         
-        hyou_past <- hyou_past |> 
-          pivot_longer(cols = !group_vars) |> 
-          rename(values_past = value)
+        # 差分計算 
+        hyou_now_long <- hyou_now |> pivot_longer(cols = !all_of(group_vars), names_to = "name", values_to = "values_now")
+        hyou_past_long <- hyou_past |> pivot_longer(cols = !all_of(group_vars), names_to = "name", values_to = "values_past")
         
         hyou <- hyou_now |> 
           left_join(hyou_past, by=c(group_vars, "name")) |> 
@@ -271,8 +273,19 @@ analysis_table_module_server <- function(id,
         compact = TRUE,
         wrap = FALSE,
         defaultPageSize = 15,
+        filterable = FALSE,
+        searchable = TRUE,
+        highlight = TRUE,
+        bordered = TRUE,
+        striped = TRUE,
+        compact = TRUE,
+        wrap = FALSE,
+        defaultPageSize = 15,
         minRows = 15,
         resizable = TRUE,
+        showPageSizeOptions = TRUE,
+        pageSizeOptions = c(10, 15, 30, 60),
+        theme = reactableTheme(
         showPageSizeOptions = TRUE,
         pageSizeOptions = c(10, 15, 30, 60),
         theme = reactableTheme(

@@ -73,7 +73,6 @@ make_ghbase_result <- function(hyou_oa_now,
       mutate(name = factor(name, levels = name_mapper, labels = names(name_mapper)))
   }
   
-  
   hh <- reactable(hyou2, columnGroups = col_group_list, columns = col_list)
   
   hexcel <- tibble::lst(
@@ -340,6 +339,8 @@ make_gh_result <- function(hyou_oa_now,
     }else if(display_type == "hensati"){
       avg_bench <- 50
     }
+    
+    
     
     gdat <- hyou_now |> 
       select(busyo = `対象`, color_this, plotthis = all_of(str_c(prefix,plot_this))) |>
