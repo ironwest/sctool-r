@@ -46,6 +46,7 @@ analysis_table_module_ui <- function(id) {
                              choices = c("縦断(推奨)" = "long","横断" = "cross")),
                  br(), # 見た目調整
                  actionButton(ns("update_table_button"), "表を更新", icon = icon("sync"))
+                 
           )
         )
       )
@@ -59,6 +60,9 @@ analysis_table_module_ui <- function(id) {
         # dataTableOutput から reactableOutput に変更
         reactableOutput(ns("summary_table")) |> withSpinner(type = 6, color = "#0dc5c1")
       )
+    ),
+    fluidRow(
+      shiny::downloadButton(ns("download_table_button"), "表をダウンロード")
     )
   )
 }
@@ -112,9 +116,8 @@ analysis_table_module_server <- function(id,
       }
 
     })
-
     
-    display_data <- eventReactive(input$update_table_button, {
+    table_data_and_settings <- eventReactive(input$update_table_button, {
       req(processed_current_year_data())
       
       display_mode <- isolate({input$display_mode})
@@ -134,34 +137,37 @@ analysis_table_module_server <- function(id,
       
       #グループ化する変数を選択
       group_vars <- isolate({switch(input$grouping_var,
-             "dept1" = "dept1",
-             "dept1_dept2" = c("dept1", "dept2"),
-             "age_kubun" = "age_kubun",
-             "gender" = "gender",
-             "dept1"
+                                    "dept1" = "dept1",
+                                    "dept1_dept2" = c("dept1", "dept2"),
+                                    "age_kubun" = "age_kubun",
+                                    "gender" = "gender",
+                                    "dept1"
       )})
       
       #どの基準値を利用するか選択
       target_sheet <- isolate({switch(input$grouping_var,
-                             "dept1" = "全体",
-                             "dept1_dept2" = "全体",
-                             "age_kubun" = "age_kubun",
-                             "gender" = "gender",
-                             "全体"
+                                      "dept1" = "全体",
+                                      "dept1_dept2" = "全体",
+                                      "age_kubun" = "age_kubun",
+                                      "gender" = "gender",
+                                      "全体"
       )})
+      
+      gyousyu <- isolate(input$gyousyu)
+      long_or_cross <- isolate(input$long_or_cross)
       
       #最終表を作成する
       if(display_mode %in% c("hensati","hensati_prev")){
         #単年度
-        hyou <- calculate_hensati_hyou(
+        hyou_base <- calculate_hensati_hyou(
           current_data = current_data, 
           hensati_data = hensati_data, 
           target_sheet = target_sheet, 
           group_vars = group_vars, 
           nbjsq = nbjsq, 
           nbjsqlabs = nbjsqlabs,
-          target_gyousyu = input$gyousyu,
-          target_longorcross = input$long_or_cross
+          target_gyousyu = gyousyu,
+          target_longorcross = long_or_cross
         )
         
       }else if(display_mode == "diff"){
@@ -173,8 +179,8 @@ analysis_table_module_server <- function(id,
           group_vars = group_vars, 
           nbjsq = nbjsq, 
           nbjsqlabs = nbjsqlabs,
-          target_gyousyu = input$gyousyu,
-          target_longorcross = input$long_or_cross
+          target_gyousyu = gyousyu,
+          target_longorcross = long_or_cross
         )
         
         hyou_past <- calculate_hensati_hyou(
@@ -184,8 +190,8 @@ analysis_table_module_server <- function(id,
           group_vars = group_vars, 
           nbjsq = nbjsq, 
           nbjsqlabs = nbjsqlabs,
-          target_gyousyu = input$gyousyu,
-          target_longorcross = input$long_or_cross
+          target_gyousyu = gyousyu,
+          target_longorcross = long_or_cross
         )
         
         hyou_now <- hyou_now |> 
@@ -203,78 +209,104 @@ analysis_table_module_server <- function(id,
           pivot_wider(id_cols = group_vars, names_from = name, values_from = diff) |> 
           ungroup()
         
+        hyou_base <- hyou
+        
       }
       
-    return(hyou)
-      
-    }, ignoreNULL = FALSE)
-    
-    # テーブルのレンダリング (renderDataTable から renderReactable に変更)
-    output$summary_table <- renderReactable({
-      req(display_data())
-      
-      
-  
-      group_vars <- isolate({switch(input$grouping_var,
-             "dept1" = "dept1",
-             "dept1_dept2" = c("dept1", "dept2"),
-             "age_kubun" = "age_kubun",
-             "gender" = "gender",
-             "dept1"
-      )})
-      
-      display_mode <- isolate({input$display_mode})
       if(display_mode == "diff"){
         sets <- setting_hensati_hyou("diff", group_vars)
       }else if(display_mode %in% c("hensati","hensati_prev")){
         sets <- setting_hensati_hyou("single", group_vars) 
       }
-    
-      #表の順番を整える-------------------
-      hyou <- display_data() |> relocate(all_of(sets$column_order))
       
-      #高ストレス者割合が少数なので100倍する
-      hyou <- hyou |>  mutate(`高ストレス者割合` = 100*高ストレス者割合)
-      
-      #limitnumber以下の人数に描画を制限する
       limitnum <- isolate(input$limitnumber)
       
+      # 表の順番を整える
+      hyou <- hyou_base |> relocate(all_of(sets$column_order))
       
-      hyou <- hyou |> 
-        mutate(ishide = (`受検人数`-`不完全回答人数`)<limitnum) |> 
-        mutate(across(.cols = !c(`受検人数`,`不完全回答人数`,ishide, matches("dept")),
-                      .fns = ~ if_else(ishide,NA,.)
-                      )) |> 
-        select(!ishide)
+      # 高ストレス者割合が少数なので100倍する (列が存在する場合のみ実行)
+      if ("高ストレス者割合" %in% names(hyou)) {
+        hyou <- hyou |> mutate(`高ストレス者割合` = 100 * `高ストレス者割合`)
+      }
+      
+      # limitnumber以下の人数に描画を制限する (列が存在する場合のみ実行)
+      if (all(c("受検人数", "不完全回答人数") %in% names(hyou))) {
+        hyou <- hyou |> 
+          mutate(ishide = (`受検人数` - `不完全回答人数`) < limitnum) |> 
+          mutate(across(.cols = !c(`受検人数`, `不完全回答人数`, ishide, matches("dept")),
+                        .fns = ~ if_else(ishide, NA, .)
+          )) |> 
+          select(!ishide)
+      }
+      
+      return(list(
+        processed_data = hyou,
+        settings = sets
+      ))
       
       
-      #reactableでの描画
+    }, ignoreNULL = FALSE)
+
+    
+
+    
+    reactable_widget <- reactive({
+      req(table_data_and_settings())
+      
+      result <- table_data_and_settings()
+      hyou_data <- result$processed_data
+      sets <- result$settings
+      
+      # reactable オブジェクトを作成
       reactable(
-        hyou,
+        hyou_data,
         defaultColDef = sets$default_col_def,
         columns = sets$column_setting_list,
         columnGroups = sets$col_group_list,
-        filterable = FALSE,     # 各列のフィルターを有効化 (DTのfilter='top'に相当)
-        searchable = TRUE,      # 全体検索ボックスを有効化
-        highlight = TRUE,       # 行をホバーした際にハイライト
-        bordered = TRUE,        # 境界線を表示
-        striped = TRUE,         # 縞模様
-        compact = TRUE,         # コンパクト表示
-        wrap = FALSE,           # 横スクロールを有効化 (DTのscrollX=TRUEに相当)
-        defaultPageSize = 15,   # 1ページの表示行数 (DTのpageLengthに相当)
+        filterable = FALSE,
+        searchable = TRUE,
+        highlight = TRUE,
+        bordered = TRUE,
+        striped = TRUE,
+        compact = TRUE,
+        wrap = FALSE,
+        defaultPageSize = 15,
         minRows = 15,
         resizable = TRUE,
-        showPageSizeOptions = TRUE, # ページサイズ変更オプションを表示
-        pageSizeOptions = c(10, 15, 30, 60), # ページサイズの選択肢
-        theme = reactableTheme( # 簡単なテーマ設定
+        showPageSizeOptions = TRUE,
+        pageSizeOptions = c(10, 15, 30, 60),
+        theme = reactableTheme(
           borderColor = "#dfe2e5",
           stripedColor = "#f6f8fa",
           highlightColor = "#f0f5ff",
           cellPadding = "8px 12px"
         )
       )
+    })
+    
+    # テーブルのレンダリング (renderDataTable から renderReactable に変更)
+    output$summary_table <- renderReactable({
+      reactable_widget()
       
     })
     
-  })
-}
+    
+    #テーブルのダウンロード
+    output$download_table_button <- downloadHandler(
+      filename = function() {
+        
+        group_name <- input$grouping_var
+        mode_name <- input$display_mode
+        paste0("集団分析結果_", group_name, "_", mode_name, "_", Sys.Date(), ".html")
+      },
+      content = function(file) {
+        req(reactable_widget(), cancelOutput = TRUE, message = "表を更新ボタンを押してください。")
+        widget_to_save <- reactable_widget()
+        
+        htmlwidgets::saveWidget(widget = widget_to_save, file = file, selfcontained = TRUE)
+      },
+      contentType = "text/html"
+    )
+      
+    })
+  }

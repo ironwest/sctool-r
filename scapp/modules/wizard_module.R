@@ -791,16 +791,16 @@ wizard_module_server <- function(id, year_label) {
         }
         
         if(!check_columns){
-          #数値が1－4のみかのチェック
+          #数値が1－4、NAのみかのチェック
           values <- df |> 
             select(matches("q\\d+")) |> 
             pivot_longer(everything()) |> 
             pull(value) |> 
             unique()
           
-          if(!all(values %in% c(1,2,3,4))){
+          if(!all(values %in% c(1,2,3,4,NA))){
             check_values <- TRUE
-            check_values_message <- "設問の回答状況が1,2,3,4以外の数字が含まれており不正です。"
+            check_values_message <- "設問の回答状況が1,2,3,4,NA以外の値が含まれており不正です。"
           }else{
             check_values <- FALSE 
             check_values_message <- ""

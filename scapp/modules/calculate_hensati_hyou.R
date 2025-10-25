@@ -6,6 +6,8 @@ calculate_hensati_hyou <- function(current_data,
                                    target_gyousyu, 
                                    target_longorcross, precise = FALSE){
   
+  
+  
   #偏差値表を作成する
   hyou <- calculate_hensati(
     d = current_data, 

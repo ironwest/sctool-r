@@ -11,6 +11,7 @@ library(tidyverse)
 #' @params ret either "hensati" or "precise"
 
 calculate_hensati <- function(d, hensati_data, tgtsheet, grp_vars, nbjsq, nbjsqlabs, ret = "hensati"){
+  
 
   #分類が性別と年代別のときは、こちらで利用する偏差値データを変更する
   #そうでないときは、基本的には全体シートを利用する
@@ -40,7 +41,7 @@ calculate_hensati <- function(d, hensati_data, tgtsheet, grp_vars, nbjsq, nbjsql
   
   d2 <- d |> 
     group_by(across(all_of(grp_vars))) |> 
-    summarise(across(all_of(tgtcols), ~mean(.))) |> 
+    summarise(across(all_of(tgtcols), ~mean(., na.rm=TRUE))) |> 
     pivot_longer(cols = !all_of(grp_vars)) |> 
     left_join(nbjsqlabs, by=c("name" = "syakudo_english")) 
   
