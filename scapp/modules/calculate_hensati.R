@@ -40,7 +40,7 @@ calculate_hensati <- function(d, hensati_data, tgtsheet, grp_vars, nbjsq, nbjsql
   
   d2 <- d |> 
     group_by(across(all_of(grp_vars))) |> 
-    summarise(across(all_of(tgtcols), ~mean(.))) |> 
+    summarise(across(all_of(tgtcols), ~mean(., na.rm=TRUE))) |> 
     pivot_longer(cols = !all_of(grp_vars)) |> 
     left_join(nbjsqlabs, by=c("name" = "syakudo_english")) 
   
