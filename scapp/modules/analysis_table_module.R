@@ -83,6 +83,8 @@ analysis_table_module_server <- function(id,
     
     ns <- session$ns
     
+    rv <- reactiveValues()
+    
     # --- リアクティブ: データの有無をチェック ---
     # データの有無をリアクティブな値として保持することで、コードの可読性を高める
     has_current_data <- reactive({ !is.null(processed_current_year_data()) })
@@ -285,7 +287,7 @@ analysis_table_module_server <- function(id,
         resizable = TRUE,
         showPageSizeOptions = TRUE,
         pageSizeOptions = c(10, 15, 30, 60),
-        theme = reactableTheme(
+        theme = reactableTheme(),
         showPageSizeOptions = TRUE,
         pageSizeOptions = c(10, 15, 30, 60),
         theme = reactableTheme(
@@ -295,6 +297,7 @@ analysis_table_module_server <- function(id,
           cellPadding = "8px 12px"
         )
       )
+      
     })
     
     # テーブルのレンダリング (renderDataTable から renderReactable に変更)
