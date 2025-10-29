@@ -1,50 +1,6 @@
 # app.R
-<<<<<<< HEAD
-
-library(shiny)
-library(shinydashboard)
-library(jsonlite)
-library(readr)
-library(stringr)
-library(purrr)
-library(dplyr)
-library(tidyr)
-library(reactable)
-library(shinycssloaders)
-library(ggplot2)
-library(broom)
-library(openxlsx2)
-library(showtext) 
-library(htmlwidgets)
-
-# モジュールUI/サーバーと、各種ヘルパー関数を読み込む
-source("modules/wizard_module.R")
-source("modules/analysis_table_module.R")
-source("modules/dept_comparison_module.R")
-source("modules/logistic_regression_module.R")
-
-# _moduleで利用する関数と設定値
-source("modules/calculate_scores.R")
-source("modules/calculate_hensati.R")
-source("modules/calculate_sougoukrisk.R")
-source("modules/calculate_hensati_hyou.R")
-
-source("modules/setting_hensati_hyou.R")
-source("modules/setting_gh_analysis.R") #ghsetting
-source("modules/setting_bench_mapper.R")
-
-source("modules/make_xx_result.R")
-source("modules/make_excel_report.R")
-
-# `%||%` 演算子 (NULL の場合にデフォルト値を返すヘルパー)
-`%||%` <- function(a, b) if (!is.null(a)) a else b
-
-#値マッピング用で利用する質問番号の順番に質問の文章が含まれるベクトル
-qtext <- read_csv("nbjsq_question_text.csv") |> dplyr::pull(qtext)
-=======
 # global.Rでライブラリやソースは読み込み済み
 source("global.R")
->>>>>>> 9aa544a6e55502540bf874db6344dc308af85e91
 
 # --- アプリケーションUIの定義 ---
 ui <- dashboardPage(
@@ -60,13 +16,8 @@ ui <- dashboardPage(
                menuSubItem("今年度データ設定", tabName = "current_year_setup"),
                menuSubItem("昨年度データ設定", tabName = "previous_year_setup")
       ),
-<<<<<<< HEAD
-      menuItem("分析", tabName = "analysis", icon = icon("chart-bar"),
-               menuSubItem("全体集計表", tabName = "analysis_table"),
-=======
       menuItem("分析", tabName = "analysis_menu", icon = icon("chart-bar"),
                menuSubItem("集計表", tabName = "analysis_table"),
->>>>>>> 9aa544a6e55502540bf874db6344dc308af85e91
                menuSubItem("部署比較分析", tabName = "dept_comparison"),
                menuSubItem("要因探索 (回帰分析)", tabName = "regression_analysis")
       )
