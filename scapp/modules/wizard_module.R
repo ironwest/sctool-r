@@ -538,30 +538,41 @@ wizard_module_server <- function(id, year_label) {
       updateSelectInput(session, "val_map_gender_male", choices = gender_choices, selected = rv$value_map_gender$male %||% "")
       updateSelectInput(session, "val_map_gender_female", choices = gender_choices, selected = rv$value_map_gender$female %||% "")
       
-      # 2. 各選択肢の作成
-      walk(1:80, ~{
-        uniquevals <- sort(unique(rv$csv_data[[input[[paste0("colmap_nbjsq_",.)]]]])) #列マッピングされた列のユニークな数字
-        updateSelectInput(session, inputId = paste0("vmap_q",.,"_1"), choices = uniquevals, selected = uniquevals[1])
-        updateSelectInput(session, inputId = paste0("vmap_q",.,"_2"), choices = uniquevals, selected = uniquevals[2])
-        updateSelectInput(session, inputId = paste0("vmap_q",.,"_3"), choices = uniquevals, selected = uniquevals[3])
-        updateSelectInput(session, inputId = paste0("vmap_q",.,"_4"), choices = uniquevals, selected = uniquevals[4])
-      })
-      
-      # 3. NBJSQ 一括設定タブのUI更新
+      # 2. NBJSQ 一括設定タブのUI更新
       target_cols <- map_chr(1:80, ~input[[paste0("colmap_nbjsq_",.)]])
       possible_choices <- rv$csv_data |> 
         dplyr::select(!!!rlang::syms(target_cols)) |> 
         pivot_longer(cols = everything()) |> 
         pull(value) |> 
         unique() |> 
-        sort() %>%
-        {c("未選択",.)}
+        sort()
+      
+      ikkatu_choice <- c(possible_choices,"未選択1","未選択2","未選択3")
         
       walk(c("A","B","C","D","EH"), ~{
-        updateSelectInput(session, inputId = paste0("oavmap_",.,"1"), choices = possible_choices)
-        updateSelectInput(session, inputId = paste0("oavmap_",.,"2"), choices = possible_choices)
-        updateSelectInput(session, inputId = paste0("oavmap_",.,"3"), choices = possible_choices)
-        updateSelectInput(session, inputId = paste0("oavmap_",.,"4"), choices = possible_choices)
+        
+        updateSelectInput(session, inputId = paste0("oavmap_",.,"1"), choices = ikkatu_choice)
+        updateSelectInput(session, inputId = paste0("oavmap_",.,"2"), choices = ikkatu_choice)
+        updateSelectInput(session, inputId = paste0("oavmap_",.,"3"), choices = ikkatu_choice)
+        updateSelectInput(session, inputId = paste0("oavmap_",.,"4"), choices = ikkatu_choice)
+      })
+      
+      walk(1:80, ~{
+        # uniquevals <- sort(unique(rv$csv_data[[input[[paste0("colmap_nbjsq_",.)]]]])) #列マッピングされた列のユニークな数字
+        # #uniquevalsの値が4つに足らない場合は、回答されていない項目があるはずなのでダミー回答というマッピング名を作成する
+        # if(length(uniquevals) < 4){
+        #   
+        #   #TODO:uniquevalsに未選択1、未選択2、未選択3、未選択4という選択がないかをチェック
+        #   
+        #   if(length(uniquevals) == 1){uniquevals <- c(uniquevals,"未選択1","未選択2","未選択3")}
+        #   if(length(uniquevals) == 2){uniquevals <- c(uniquevals,"未選択1","未選択2")}
+        #   if(length(uniquevals) == 3){uniquevals <- c(uniquevals,"未選択1")}
+        # }
+        
+        updateSelectInput(session, inputId = paste0("vmap_q",.,"_1"), choices = ikkatu_choice, selected = ikkatu_choice[1])
+        updateSelectInput(session, inputId = paste0("vmap_q",.,"_2"), choices = ikkatu_choice, selected = ikkatu_choice[2])
+        updateSelectInput(session, inputId = paste0("vmap_q",.,"_3"), choices = ikkatu_choice, selected = ikkatu_choice[3])
+        updateSelectInput(session, inputId = paste0("vmap_q",.,"_4"), choices = ikkatu_choice, selected = ikkatu_choice[4])
       })
     
     }) # observeの終わり
