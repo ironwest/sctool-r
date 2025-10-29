@@ -295,7 +295,7 @@ analysis_table_module_server <- function(id,
           cellPadding = "8px 12px"
         )
       )
-    })
+    )})
     
     # テーブルのレンダリング (renderDataTable から renderReactable に変更)
     output$summary_table <- renderReactable({
@@ -322,4 +322,4 @@ analysis_table_module_server <- function(id,
     )
       
     })
-  }
+}
