@@ -539,35 +539,15 @@ wizard_module_server <- function(id, year_label) {
       updateSelectInput(session, "val_map_gender_female", choices = gender_choices, selected = rv$value_map_gender$female %||% "")
       
       # 2. NBJSQ 一括設定タブのUI更新
-      target_cols <- map_chr(1:80, ~input[[paste0("colmap_nbjsq_",.)]] %||% "")
+      target_cols <- map_chr(1:80, ~input[[paste0("colmap_nbjsq_",.)]])
+      possible_choices <- rv$csv_data |> 
+        dplyr::select(!!!rlang::syms(target_cols)) |> 
+        pivot_longer(cols = everything()) |> 
+        pull(value) |> 
+        unique() |> 
+        sort()
       
-      # 2-2. 実際にデータに存在し、かつマッピングされている(=""でない)列名だけを抽出
-      target_cols_valid <- target_cols[target_cols %in% names(rv$csv_data) & target_cols != ""]
-      
-      if (length(target_cols_valid) > 0) {
-        # 2-3. 有効な列名が1つ以上ある場合、全ユニーク値を取得
-        possible_choices <- rv$csv_data |>
-          # ★エラー原因箇所： all_of() を使い、有効な列(target_cols_valid)のみを指定する
-          dplyr::select(dplyr::all_of(target_cols_valid)) |>
-          pivot_longer(cols = everything()) |>
-          pull(value) |>
-          stats::na.omit() |> # NAは除外
-          unique() |>
-          sort()
-      } else {
-        # 2-4. 有効な列名が一つもない場合、空のベクトルに
-        possible_choices <- character(0) 
-      }
-      
-      data_choices <- stats::setNames(possible_choices, possible_choices)
-      dummy_choices <- stats::setNames(c("未選択1","未選択2","未選択3"), c("未選択1","未選択2","未選択3"))
-      
-      # 　 最初に「未選択」を、次にデータ値、最後にダミー値を設定
-      ikkatu_choice <- c("未選択" = "", data_choices, dummy_choices)
-      
-      # 2-6. 個別タブの自動選択(selected)用の安全なリストを作成
-      # 　 (例: データが "1" しかない場合 -> list("1", "", "", "") )
-      safe_selected <- c(as.list(possible_choices), list("", "", "", ""))[1:4]
+      ikkatu_choice <- c(possible_choices,"未選択1","未選択2","未選択3")
         
       walk(c("A","B","C","D","EH"), ~{
         
@@ -578,19 +558,21 @@ wizard_module_server <- function(id, year_label) {
       })
       
       walk(1:80, ~{
-        # JSONファイルからロードした設定 (rv$value_map_nbjsq_individual) があればそれを優先
-        q_id_str <- paste0("q", .)
-        selected_vals_from_rv <- rv$value_map_nbjsq_individual[[q_id_str]]
+        # uniquevals <- sort(unique(rv$csv_data[[input[[paste0("colmap_nbjsq_",.)]]]])) #列マッピングされた列のユニークな数字
+        # #uniquevalsの値が4つに足らない場合は、回答されていない項目があるはずなのでダミー回答というマッピング名を作成する
+        # if(length(uniquevals) < 4){
+        #   
+        #   #TODO:uniquevalsに未選択1、未選択2、未選択3、未選択4という選択がないかをチェック
+        #   
+        #   if(length(uniquevals) == 1){uniquevals <- c(uniquevals,"未選択1","未選択2","未選択3")}
+        #   if(length(uniquevals) == 2){uniquevals <- c(uniquevals,"未選択1","未選択2")}
+        #   if(length(uniquevals) == 3){uniquevals <- c(uniquevals,"未選択1")}
+        # }
         
-        sel1 <- selected_vals_from_rv[[1]] %||% safe_selected[[1]]
-        sel2 <- selected_vals_from_rv[[2]] %||% safe_selected[[2]]
-        sel3 <- selected_vals_from_rv[[3]] %||% safe_selected[[3]]
-        sel4 <- selected_vals_from_rv[[4]] %||% safe_selected[[4]]
-        
-        updateSelectInput(session, inputId = paste0("vmap_q",.,"_1"), choices = ikkatu_choice, selected = sel1)
-        updateSelectInput(session, inputId = paste0("vmap_q",.,"_2"), choices = ikkatu_choice, selected = sel2)
-        updateSelectInput(session, inputId = paste0("vmap_q",.,"_3"), choices = ikkatu_choice, selected = sel3)
-        updateSelectInput(session, inputId = paste0("vmap_q",.,"_4"), choices = ikkatu_choice, selected = sel4)
+        updateSelectInput(session, inputId = paste0("vmap_q",.,"_1"), choices = ikkatu_choice, selected = ikkatu_choice[1])
+        updateSelectInput(session, inputId = paste0("vmap_q",.,"_2"), choices = ikkatu_choice, selected = ikkatu_choice[2])
+        updateSelectInput(session, inputId = paste0("vmap_q",.,"_3"), choices = ikkatu_choice, selected = ikkatu_choice[3])
+        updateSelectInput(session, inputId = paste0("vmap_q",.,"_4"), choices = ikkatu_choice, selected = ikkatu_choice[4])
       })
     
     }) # observeの終わり
