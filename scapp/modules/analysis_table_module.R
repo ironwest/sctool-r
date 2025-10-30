@@ -267,7 +267,6 @@ analysis_table_module_server <- function(id,
         defaultColDef = sets$default_col_def,
         columns = sets$column_setting_list,
         columnGroups = sets$col_group_list,
-        defaultPageSize = 15,
         filterable = FALSE,
         searchable = TRUE,
         highlight = TRUE,
@@ -278,8 +277,6 @@ analysis_table_module_server <- function(id,
         
         minRows = 15,
         resizable = TRUE,
-        
-        
         showPageSizeOptions = TRUE,
         pageSizeOptions = c(10, 15, 30, 60),
         theme = reactableTheme(
