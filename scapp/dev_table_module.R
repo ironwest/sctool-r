@@ -15,7 +15,8 @@ source("modules/setting_hensati_hyou.R")
 
 # --- 4. モジュールをテストするためのスタンドアロンアプリ ---
 # ダミーデータの作成
-dummy_current_data <- read_csv("demodata/processed_nbjsq_dummy_data1_alpha.csv")
+#dummy_current_data <- read_csv("demodata/processed_nbjsq_dummy_data1_good.csv")
+dummy_current_data <- read_csv(r"(G:\マイドライブ\A04_ストレスチェック集団解析\KWK\データ\processed_集団分析用データ - 結合データ.csv)")
 dummy_previous_data <- read_csv("demodata/processed_nbjsq_dummy_data2_alpha.csv")
 
 # ---- アプリUI ----

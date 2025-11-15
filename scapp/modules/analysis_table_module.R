@@ -37,7 +37,7 @@ analysis_table_module_ui <- function(id) {
                              choices = c("偏差値(今回)" = "hensati",
                                          #"前回との差" = "diff",
                                          "偏差値(前回)" = "hensati_prev")),
-                 numericInput(ns("limitnumber"),"分析対象の最低人数を設定する",value=10, min=5)
+                 numericInput(ns("limitnumber"),"分析対象の最低人数を設定する",value=10, min=1)
           ),
           column(width = 4,
                  selectInput(ns("gyousyu"), "総合健康リスク計算の業種の選択",
@@ -62,7 +62,8 @@ analysis_table_module_ui <- function(id) {
       )
     ),
     fluidRow(
-      shiny::downloadButton(ns("download_table_button"), "表をダウンロード")
+      shiny::downloadButton(ns("download_table_button"), "表をダウンロード"),
+      shiny::downloadButton(ns("download_text_button"), "生成AI用Text形式でのダウンロード")
     )
   )
 }
@@ -162,6 +163,7 @@ analysis_table_module_server <- function(id,
       long_or_cross <- isolate(input$long_or_cross)
       
       #最終表を作成する
+      #TODO 「全体」の結果を一番上に表示するようにするための表データを作成する。calculate_hensati_hyou関数を何とかするのがよさそう。
       if(display_mode %in% c("hensati","hensati_prev")){
         #単年度
         hyou_base <- calculate_hensati_hyou(
@@ -235,9 +237,10 @@ analysis_table_module_server <- function(id,
       
       # limitnumber以下の人数に描画を制限する (列が存在する場合のみ実行)
       if (all(c("受検人数", "不完全回答人数") %in% names(hyou))) {
+        
         hyou <- hyou |> 
           mutate(ishide = (`受検人数` - `不完全回答人数`) < limitnum) |> 
-          mutate(across(.cols = !c(`受検人数`, `不完全回答人数`, ishide, matches("dept")),
+          mutate(across(.cols = !c(`受検人数`, `不完全回答人数`, ishide, matches("dept"), matches("age_kubun"), matches("gender")),
                         .fns = ~ if_else(ishide, NA, .)
           )) |> 
           select(!ishide)
@@ -274,20 +277,9 @@ analysis_table_module_server <- function(id,
         striped = TRUE,
         compact = TRUE,
         wrap = FALSE,
-        defaultPageSize = 15,
-        filterable = FALSE,
-        searchable = TRUE,
-        highlight = TRUE,
-        bordered = TRUE,
-        striped = TRUE,
-        compact = TRUE,
-        wrap = FALSE,
-        defaultPageSize = 15,
+        
         minRows = 15,
         resizable = TRUE,
-        showPageSizeOptions = TRUE,
-        pageSizeOptions = c(10, 15, 30, 60),
-        theme = reactableTheme(),
         showPageSizeOptions = TRUE,
         pageSizeOptions = c(10, 15, 30, 60),
         theme = reactableTheme(
@@ -323,6 +315,27 @@ analysis_table_module_server <- function(id,
       },
       contentType = "text/html"
     )
+    
+    output$download_text_button <- downloadHandler(
+      filename = function() {
+        group_name <- input$grouping_var
+        mode_name <- input$display_mode
+        paste0("集団分析結果_", group_name, "_", mode_name, "_", Sys.Date(), ".csv")
+      },
+      content = function(file){
+        
+        req(reactable_widget(), cancelOutput = TRUE, message = "表を更新ボタンを押してください。")
+        
+        result <- table_data_and_settings()
+        hyou_data <- result$processed_data
+        
+        write_excel_csv(hyou_data, file = file,col_names = TRUE)
+        
+        #prompt案：このファイルは、ストレスチェックの集団分析結果です。数字は基本的には偏差値で示されており、値が高いと「良い」、値が低いと「悪い」結果です。この結果から、事業場に対して、産業医とｓｈちえ行うフィードバックについて、レポートをなるべく簡潔に、作成ｓｈちえください。
+      }
+    )
       
     })
+  
+  
 }

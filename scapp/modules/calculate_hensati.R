@@ -12,6 +12,7 @@ library(tidyverse)
 
 calculate_hensati <- function(d, hensati_data, tgtsheet, grp_vars, nbjsq, nbjsqlabs, ret = "hensati"){
   
+  #if(grp_vars == "age_kubun") browser() #デバッグ用
 
   #分類が性別と年代別のときは、こちらで利用する偏差値データを変更する
   #そうでないときは、基本的には全体シートを利用する
