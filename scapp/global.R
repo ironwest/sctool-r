@@ -15,12 +15,12 @@ library(shinycssloaders)
 library(ggplot2)
 library(broom)
 library(openxlsx2)
-library(showtext)
+#library(showtext)
 
 # --- 2. 日本語フォントの設定 ---
 # アプリケーションの実行環境に応じて適切なフォントを指定
-font_add_google("Noto Sans JP", "notosans-jp")
-showtext_auto()
+#font_add_google("Noto Sans JP", "notosans-jp")
+#showtext_auto()
 
 # --- 3. モジュールとヘルパー関数の読み込み ---
 source("modules/wizard_module.R")

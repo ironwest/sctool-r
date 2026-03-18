@@ -1,8 +1,8 @@
 library(openxlsx2)
 library(reactable)
-library(showtext)
+#library(showtext)
 
-font_add_google("Noto Sans JP", family = "noto-sans-jp")
+#font_add_google("Noto Sans JP", family = "noto-sans-jp")
 
 # report_params <- read_rds("repparam.rds")
 
