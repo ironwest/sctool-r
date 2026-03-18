@@ -18,7 +18,7 @@ calculate_hensati_hyou <- function(current_data,
   )
   
   #全体の偏差値表も作成する
-  oa_data <- current_data |> mutate(dept1 = "全体", dept2 = "全体", gender = "全体", age_kubun = "全体")
+  oa_data <- current_data |> mutate(across(all_of(group_vars), ~"全体"), dept1 = "全体", dept2 = "全体", gender = "全体", age_kubun = "全体")
   oa_hyou <- calculate_hensati(
     d = oa_data, 
     hensati_data = hensati_data, 
@@ -77,28 +77,32 @@ calculate_hensati_hyou <- function(current_data,
       `高ストレス者割合` = `高ストレス者人数`/`受検人数`
     )
   
-  hyouhs <- bind_rows(oa_hyouhs, hyouhs)
-  
+  if(!precise){
+    hyouhs <- bind_rows(oa_hyouhs, hyouhs)
+  }
+
   hyou <- hyou |> left_join(hyouhs, by=group_vars)
-  
+
   #20251031: 06:48 ここまでやった。続きはこのあと。Overallデータを表に続いて追加していく！
   #総合健康リスクの計算
-  
+
   hyouskrisk <- calculate_sougoukrisk(
     d = current_data,
     grp_vars = group_vars,
     tgtgyousyu = target_gyousyu,
     precise=TRUE
   )
-  
+
   oa_hyouskrisk <- calculate_sougoukrisk(
     d = oa_data,
     grp_vars = group_vars,
     tgtgyousyu = target_gyousyu,
     precise=TRUE
   )
-  
-  hyouskrisk <- bind_rows(oa_hyouskrisk, hyouskrisk)
+
+  if(!precise){
+    hyouskrisk <- bind_rows(oa_hyouskrisk, hyouskrisk)
+  }
   
   if(precise) {
     #do not select when precise is TRUE

@@ -320,16 +320,17 @@ make_gh_result <- function(hyou_oa_now,
   col_list[["name"]] <- colDef(name = "項目", align="left" , format = colFormat(digits=2))
   col_list[["ベンチマーク"]] <- colDef(name = "ベンチマーク", align="left" , format = colFormat(digits=2))
   
-  hyou2 <- hyou |> 
-    pivot_longer(cols = !c(`対象`,`時期`)) |> 
-    pivot_wider(id_cols = `name`, names_from = c(`対象`,`時期`), values_from = value) |> 
-    left_join(bench_data |> rename(`ベンチマーク` = `平均値`), by=c("name"="尺度名bench"))
-  
+  hyou2 <- hyou |>
+    pivot_longer(cols = !c(`対象`,`時期`)) |>
+    pivot_wider(id_cols = `name`, names_from = c(`対象`,`時期`), values_from = value) |>
+    left_join(bench_data |> rename(`ベンチマーク` = `平均値`), by=c("name"="尺度名bench")) |>
+    mutate(across(where(is.numeric), ~round(., 1)))
+
   if(all(is.na(hyou2$全体_前回))){
-    hyou2 <- hyou2 |> 
+    hyou2 <- hyou2 |>
       mutate(across(matches("前回"),~{"-"}))
   }
-  
+
   hh <- reactable(hyou2, columnGroups = col_group_list, columns = col_list)
 
   if(mode == "gh"){
@@ -451,8 +452,9 @@ make_qq_result <- function(data_now,
         mutate(good_percent = if_else(good_value == 1, (`1`+`2`)/(`1`+`2`+`3`+`4`), (`3`+`4`)/(`1`+`2`+`3`+`4`)))
     
       
-      GOOD_COLOR <- "lightcyan"  # 良いイメージの色
-      BAD_COLOR <- "mistyrose"   # 悪いイメージの色
+      GOOD_COLOR    <- "lightcyan"  # 良いイメージの色
+      BAD_COLOR     <- "mistyrose"  # 悪いイメージの色
+      NEUTRAL_COLOR <- "#ffffff"    # 中立（白）
       
       col_list <- list(
         syakudo_minor = colDef(name = "尺度", width=250, vAlign = "center", align = "left"),

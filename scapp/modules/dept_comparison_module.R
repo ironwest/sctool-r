@@ -337,7 +337,7 @@ dept_comparison_module_server <- function(id, processed_data_now, processed_data
                              analysis_displaytype = input$analysis_displaytype,
                              numlimit = input$numlimit,
                              show_numlimit_modal = TRUE)
-      }, error = function(e) { tibble() })
+      }, error = function(e) { message("gen_analysis_results error: ", conditionMessage(e)); NULL })
     
       
       return(res)

@@ -47,4 +47,7 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
-"scapp/modules/temp.rds" 
+"scapp/modules/temp.rds"
+
+# Go+Wails project (separate git repository)
+sctool-go/
